@@ -1,0 +1,228 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OCA\NextLedger\Controller;
+
+use OCA\NextLedger\Db\Offer;
+use OCA\NextLedger\Db\OfferMapper;
+use OCA\NextLedger\Service\OfferPdfService;
+use OCA\NextLedger\Service\NumberGenerator;
+use OCP\AppFramework\ApiController;
+use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\DataDownloadResponse;
+use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\Response;
+use OCP\IRequest;
+
+class OffersController extends ApiController {
+    public function __construct(
+        string $appName,
+        IRequest $request,
+        private OfferMapper $offerMapper,
+        private NumberGenerator $numberGenerator,
+        private OfferPdfService $offerPdfService,
+    ) {
+        parent::__construct($appName, $request);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function list(?string $caseId = null, ?string $customerId = null): JSONResponse {
+        $caseFilter = null;
+        if ($caseId !== null && $caseId !== '') {
+            $caseFilter = (int)$caseId;
+        }
+
+        $customerFilter = null;
+        if ($customerId !== null && $customerId !== '') {
+            $customerFilter = (int)$customerId;
+        }
+
+        if ($caseFilter !== null) {
+            $items = $this->offerMapper->findByCaseId($caseFilter);
+        } elseif ($customerFilter !== null) {
+            $items = $this->offerMapper->findByCustomerId($customerFilter);
+        } else {
+            $items = $this->offerMapper->findAll();
+        }
+
+        $data = array_map(fn(Offer $offer) => $this->entityToArray($offer), $items);
+        usort($data, static fn(array $a, array $b) => ($b['issueDate'] ?? 0) <=> ($a['issueDate'] ?? 0));
+
+        return new JSONResponse($data);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function show(string $id): JSONResponse {
+        $offerId = (int)$id;
+        try {
+            /** @var Offer $offer */
+            $offer = $this->offerMapper->find($offerId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        return new JSONResponse($this->entityToArray($offer));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function create(
+        ?int $caseId = null,
+        ?int $customerId = null,
+        ?string $number = null,
+        ?string $status = null,
+        ?int $issueDate = null,
+        ?int $validUntil = null,
+        ?string $greetingText = null,
+        ?string $extraText = null,
+        ?string $footerText = null,
+        ?int $subtotalCents = null,
+        ?int $taxCents = null,
+        ?int $totalCents = null,
+        ?int $taxRateBp = null,
+        ?bool $isSmallBusiness = null,
+    ): JSONResponse {
+        if ($caseId === null) {
+            return new JSONResponse(['message' => 'Vorgang erforderlich.'], Http::STATUS_BAD_REQUEST);
+        }
+        $offer = new Offer();
+        $offer->setCaseId($caseId);
+        $offer->setCustomerId($customerId);
+        $offer->setNumber($number ?: $this->numberGenerator->nextOfferNumber());
+        $offer->setStatus($status ?: 'draft');
+        $offer->setIssueDate($issueDate ?? time());
+        $offer->setValidUntil($validUntil);
+        $offer->setGreetingText($greetingText);
+        $offer->setExtraText($extraText);
+        $offer->setFooterText($footerText);
+        $offer->setSubtotalCents($subtotalCents);
+        $offer->setTaxCents($taxCents);
+        $offer->setTotalCents($totalCents);
+        $offer->setTaxRateBp($taxRateBp);
+        $offer->setIsSmallBusiness($isSmallBusiness ?? false);
+        $offer->setCreatedAt(time());
+        $offer->setUpdatedAt(time());
+
+        $saved = $this->offerMapper->insert($offer);
+        return new JSONResponse($this->entityToArray($saved));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function update(
+        string $id,
+        ?int $caseId = null,
+        ?int $customerId = null,
+        ?string $number = null,
+        ?string $status = null,
+        ?int $issueDate = null,
+        ?int $validUntil = null,
+        ?string $greetingText = null,
+        ?string $extraText = null,
+        ?string $footerText = null,
+        ?int $subtotalCents = null,
+        ?int $taxCents = null,
+        ?int $totalCents = null,
+        ?int $taxRateBp = null,
+        ?bool $isSmallBusiness = null,
+    ): JSONResponse {
+        $offerId = (int)$id;
+        try {
+            /** @var Offer $offer */
+            $offer = $this->offerMapper->find($offerId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        if ($caseId === null) {
+            return new JSONResponse(['message' => 'Vorgang erforderlich.'], Http::STATUS_BAD_REQUEST);
+        }
+        $offer->setCaseId($caseId);
+        $offer->setCustomerId($customerId);
+        if ($number !== null && $number !== '') {
+            $offer->setNumber($number);
+        }
+        $offer->setStatus($status);
+        $offer->setIssueDate($issueDate);
+        $offer->setValidUntil($validUntil);
+        $offer->setGreetingText($greetingText);
+        $offer->setExtraText($extraText);
+        $offer->setFooterText($footerText);
+        $offer->setSubtotalCents($subtotalCents);
+        $offer->setTaxCents($taxCents);
+        $offer->setTotalCents($totalCents);
+        $offer->setTaxRateBp($taxRateBp);
+        $offer->setIsSmallBusiness($isSmallBusiness ?? false);
+        $offer->setUpdatedAt(time());
+
+        $saved = $this->offerMapper->update($offer);
+        return new JSONResponse($this->entityToArray($saved));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function destroy(string $id): JSONResponse {
+        $offerId = (int)$id;
+        try {
+            /** @var Offer $offer */
+            $offer = $this->offerMapper->find($offerId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $this->offerMapper->delete($offer);
+        return new JSONResponse(['status' => 'ok']);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function pdf(string $id): Response {
+        $offerId = (int)$id;
+        try {
+            $result = $this->offerPdfService->buildPdf($offerId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        } catch (\Throwable $e) {
+            return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+
+        /** @var Offer $offer */
+        $offer = $this->offerMapper->find($offerId);
+        $offer->setPdfGeneratedAt(time());
+        $offer->setUpdatedAt(time());
+        $this->offerMapper->update($offer);
+
+        return new DataDownloadResponse(
+            $result['content'],
+            $result['filename'],
+            'application/pdf'
+        );
+    }
+
+    private function entityToArray(object $entity): array {
+        if (method_exists($entity, 'jsonSerialize')) {
+            /** @var array $data */
+            $data = $entity->jsonSerialize();
+            return $data;
+        }
+
+        return get_object_vars($entity);
+    }
+}

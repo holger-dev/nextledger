@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+  <id>nextledger</id>
+  <name>NextLedger</name>
+  <summary>Accounting, CRM, invoices, offers, and annual profit/loss reports.</summary>
+  <description>NextLedger provides bookkeeping, customer management, invoicing, offers, and annual profit/loss reports inside Nextcloud.</description>
+  <version>1.0.0</version>
+  <namespace>NextLedger</namespace>
+  <author>NextLedger</author>
+  <licence>agpl</licence>
+  <category>office</category>
+  <navigations>
+    <navigation>
+      <name>NextLedger</name>
+      <route>nextledger.page.index</route>
+      <order>50</order>
+    </navigation>
+  </navigations>
+  <dependencies>
+    <nextcloud min-version="32" max-version="32"/>
+  </dependencies>
+</info>
