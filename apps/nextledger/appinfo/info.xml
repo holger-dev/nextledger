@@ -4,12 +4,19 @@
   <id>nextledger</id>
   <name>NextLedger</name>
   <summary>Accounting, CRM, invoices, offers, and annual profit/loss reports.</summary>
-  <description>NextLedger provides bookkeeping, customer management, invoicing, offers, and annual profit/loss reports inside Nextcloud.</description>
+  <description>
+    NextLedger provides bookkeeping, customer management, invoicing, offers,
+    and annual profit/loss reports inside Nextcloud.
+  </description>
   <version>1.0.0</version>
   <namespace>NextLedger</namespace>
-  <author>NextLedger</author>
-  <licence>agpl</licence>
+  <author mail="holger@heidkamp.dev">NextLedger</author>
+  <licence>AGPL-3.0-or-later</licence>
   <category>office</category>
+  <website>https://github.com/holger-dev/nextledger</website>
+  <bugs>https://github.com/holger-dev/nextledger/issues</bugs>
+  <repository type="git">https://github.com/holger-dev/nextledger.git</repository>
+  <documentation>https://github.com/holger-dev/nextledger#readme</documentation>
   <navigations>
     <navigation>
       <name>NextLedger</name>
@@ -18,6 +25,6 @@
     </navigation>
   </navigations>
   <dependencies>
-    <nextcloud min-version="32" max-version="32"/>
+    <nextcloud min-version="30" max-version="32"/>
   </dependencies>
 </info>
