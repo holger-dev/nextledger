@@ -1,0 +1,99 @@
+name: Build and publish Nextcloud app release
+
+on:
+  release:
+    types: [published]
+
+env:
+  APP_NAME: nextledger
+
+jobs:
+  build_and_publish:
+    environment: release
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php-versions: ['8.2']
+        nextcloud: ['stable32']
+        database: ['sqlite']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build frontend (webpack -> apps/nextledger/js)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-versions }}
+          extensions: pdo_sqlite,pdo_mysql,pdo_pgsql,gd,zip
+          coverage: none
+
+      - name: Set up Nextcloud server
+        uses: SMillerDev/nextcloud-actions/setup-nextcloud@v1
+        with:
+          cron: false
+          version: ${{ matrix.nextcloud }}
+          database-type: ${{ matrix.database }}
+
+      - name: Copy app into Nextcloud server
+        run: |
+          rsync -a --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            ./apps/${{ env.APP_NAME }}/ \
+            ../server/apps/${{ env.APP_NAME }}/
+
+      - name: Install PHP dependencies (composer --no-dev)
+        run: |
+          cd ../server/apps/${{ env.APP_NAME }}
+          if [ -f composer.json ]; then
+            composer install --no-dev --prefer-dist --optimize-autoloader
+          fi
+
+      - name: Write certificate and key from secrets
+        run: |
+          mkdir -p ~/.nextcloud/certificates
+          printf "%s" "${{ secrets.APP_PRIVATE_KEY }}" > ~/.nextcloud/certificates/${{ env.APP_NAME }}.key
+          printf "%s" "${{ secrets.APP_PUBLIC_CRT }}"  > ~/.nextcloud/certificates/${{ env.APP_NAME }}.crt
+          chmod 600 ~/.nextcloud/certificates/${{ env.APP_NAME }}.key
+          chmod 644 ~/.nextcloud/certificates/${{ env.APP_NAME }}.crt
+
+      - name: Create signed release archive (make appstore)
+        run: |
+          cd ../server/apps/${{ env.APP_NAME }}
+          make appstore
+
+      - name: Upload app tarball to GitHub release
+        uses: svenstaro/upload-release-action@v2
+        id: attach_to_release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ../server/apps/${{ env.APP_NAME }}/build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
+          asset_name: ${{ env.APP_NAME }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
+
+      - name: Upload app to Nextcloud App Store
+        uses: R0Wi/nextcloud-appstore-push-action@v1
+        with:
+          app_name: ${{ env.APP_NAME }}
+          appstore_token: ${{ secrets.APPSTORE_TOKEN }}
+          download_url: ${{ steps.attach_to_release.outputs.browser_download_url }}
+          app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          nightly: ${{ github.event.release.prerelease }}
+
+      - name: Cleanup local cert/key
+        run: rm -f ~/.nextcloud/certificates/*
