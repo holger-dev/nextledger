@@ -1,0 +1,11 @@
+# Local clones
+/tmp-familybudget
+
+# OS
+.DS_Store
+
+# Node
+node_modules
+
+# Composer
+vendor
