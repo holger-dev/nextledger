@@ -15,6 +15,9 @@ class Customer extends Entity {
     public $zip;
     public $city;
     public $email;
+    public $billingEmail;
+    public $sendInvoiceToBillingEmail;
+    public $sendInvoiceToContactEmail;
     public $createdAt;
     public $updatedAt;
 
@@ -26,6 +29,9 @@ class Customer extends Entity {
         $this->addType('zip', 'string');
         $this->addType('city', 'string');
         $this->addType('email', 'string');
+        $this->addType('billingEmail', 'string');
+        $this->addType('sendInvoiceToBillingEmail', 'boolean');
+        $this->addType('sendInvoiceToContactEmail', 'boolean');
         $this->addType('createdAt', 'integer');
         $this->addType('updatedAt', 'integer');
     }

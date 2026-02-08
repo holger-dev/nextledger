@@ -24,7 +24,7 @@
       </div>
 
       <div v-if="showGeneral" class="general">
-        <div v-if="offerOptions.length" class="form-group">
+        <div v-if="invoiceTypeAllowsOfferCopy && offerOptions.length" class="form-group">
           <NcSelect
             id="invoiceOffer"
             v-model="selectedOfferId"
@@ -40,6 +40,19 @@
         </div>
 
         <div class="form-grid">
+          <div class="form-group">
+            <NcSelect
+              id="invoiceType"
+              v-model="form.invoiceType"
+              :options="invoiceTypeOptions"
+              :reduce="(option) => option.value"
+              :append-to-body="false"
+              :clearable="false"
+              input-label="Rechnungstyp"
+              :label-outside="true"
+              placeholder="Rechnungstyp"
+            />
+          </div>
           <div class="form-group">
             <NcTextField
               label="Rechnungsnummer"
@@ -92,6 +105,42 @@
               :value.sync="form.dueDate"
             />
             <p v-if="fieldErrors.dueDate" class="field-error">{{ fieldErrors.dueDate }}</p>
+          </div>
+          <div class="form-group">
+            <NcSelect
+              id="invoiceRelatedOffer"
+              v-model="form.relatedOfferId"
+              :options="offerOptions"
+              :reduce="(option) => option.value"
+              :append-to-body="false"
+              :clearable="false"
+              input-label="Angebot (optional)"
+              :label-outside="true"
+              placeholder="Bitte auswählen"
+            />
+            <p v-if="fieldErrors.relatedOfferId" class="field-error">{{ fieldErrors.relatedOfferId }}</p>
+          </div>
+          <div v-if="form.invoiceType === 'advance'" class="form-group">
+            <NcDateTimePickerNative
+              id="servicePeriodStart"
+              v-model="form.servicePeriodStart"
+              type="date"
+              label="Leistungszeitraum (Start) *"
+            />
+            <p v-if="fieldErrors.servicePeriodStart" class="field-error">
+              {{ fieldErrors.servicePeriodStart }}
+            </p>
+          </div>
+          <div v-if="form.invoiceType === 'advance'" class="form-group">
+            <NcDateTimePickerNative
+              id="servicePeriodEnd"
+              v-model="form.servicePeriodEnd"
+              type="date"
+              label="Leistungszeitraum (Ende) *"
+            />
+            <p v-if="fieldErrors.servicePeriodEnd" class="field-error">
+              {{ fieldErrors.servicePeriodEnd }}
+            </p>
           </div>
         </div>
 
@@ -211,6 +260,15 @@
           Gesamt: {{ formatPrice(totalCents) }}
         </div>
       </div>
+      <div v-if="billingSummary" class="summary billing-summary">
+        <div>
+          <p><strong>Projektübersicht</strong></p>
+          <p>Auftragssumme: {{ formatPrice(billingSummary.offerTotalCents) }}</p>
+          <p>Bisher abgerechnet (Abschläge): {{ formatPrice(billingSummary.advanceBilledCents) }}</p>
+          <p>Dieser Betrag: {{ formatPrice(billingSummary.currentCents) }}</p>
+          <p>Rest danach: {{ formatPrice(billingSummary.remainingCents) }}</p>
+        </div>
+      </div>
 
       <hr class="divider" />
 
@@ -230,10 +288,11 @@
 <script>
 import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
+import NcDateTimePickerNative from '@nextcloud/vue/dist/Components/NcDateTimePickerNative.mjs'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
-import { createInvoice } from '../api/invoices'
+import { createInvoice, getInvoices } from '../api/invoices'
 import { createInvoiceItem } from '../api/invoiceItems'
 import { getCases } from '../api/cases'
 import { getCustomers } from '../api/customers'
@@ -263,15 +322,33 @@ const fromDateInput = (value) => {
     return null
   }
   const date = new Date(`${value}T00:00:00`)
-  return Math.floor(date.getTime() / 1000)
+  const utcSeconds = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 1000
+  return Math.floor(utcSeconds)
 }
 
-const todayInput = () => new Date().toISOString().slice(0, 10)
+const isValidPickerDate = (value) =>
+  value instanceof Date && !Number.isNaN(value.getTime())
+
+const fromPickerDate = (value) => {
+  if (!isValidPickerDate(value)) {
+    return null
+  }
+  // Store as UTC date (midnight) to avoid timezone shifts in PDFs.
+  const utcSeconds = Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()) / 1000
+  return Math.floor(utcSeconds)
+}
+
+const toDateInput = (date) => {
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+const todayInput = () => toDateInput(new Date())
 
 const addDaysInput = (dateInput, days) => {
   const date = new Date(`${dateInput}T00:00:00`)
   date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
+  return toDateInput(date)
 }
 
 const createEmptyItem = () => ({
@@ -304,6 +381,7 @@ export default {
   name: 'InvoiceCreate',
   components: {
     NcButton,
+    NcDateTimePickerNative,
     NcLoadingIcon,
     NcSelect,
     NcTextArea,
@@ -320,6 +398,7 @@ export default {
       cases: [],
       products: [],
       offers: [],
+      invoices: [],
       fiscalYears: [],
       texts: null,
       tax: null,
@@ -329,6 +408,10 @@ export default {
       form: {
         customerId: null,
         caseId: null,
+        invoiceType: 'standard',
+        relatedOfferId: null,
+        servicePeriodStart: null,
+        servicePeriodEnd: null,
         issueDate: '',
         dueDate: '',
         greetingText: '',
@@ -375,6 +458,13 @@ export default {
         value: product.id,
       }))
     },
+    invoiceTypeOptions() {
+      return [
+        { label: 'Standard', value: 'standard' },
+        { label: 'Abschlagsrechnung', value: 'advance' },
+        { label: 'Schlussrechnung', value: 'final' },
+      ]
+    },
     positionTypeOptions() {
       return [
         { label: 'Produkt/DL', value: 'product' },
@@ -397,12 +487,26 @@ export default {
     totalCents() {
       return this.subtotalCents + this.taxCents
     },
+    isAdvanceOrFinal() {
+      return ['advance', 'final'].includes(this.form.invoiceType)
+    },
+    invoiceTypeAllowsOfferCopy() {
+      return this.form.invoiceType === 'standard'
+    },
     hasActiveFiscalYear() {
       return this.fiscalYears.some((year) => !!year.isActive)
     },
     canSave() {
       if (!this.form.customerId || !this.form.caseId) {
         return false
+      }
+      if (this.form.invoiceType === 'advance') {
+        if (!isValidPickerDate(this.form.servicePeriodStart)) {
+          return false
+        }
+        if (!isValidPickerDate(this.form.servicePeriodEnd)) {
+          return false
+        }
       }
       const validItems = this.form.items.filter((item) => {
         const quantity = Number(item.quantity)
@@ -416,6 +520,26 @@ export default {
         return (item.name || '').trim() !== ''
       })
       return validItems.length > 0
+    },
+    billingSummary() {
+      if (!this.isAdvanceOrFinal || !this.form.relatedOfferId) {
+        return null
+      }
+      const offer = this.offers.find((entry) => entry.id === this.form.relatedOfferId)
+      if (!offer || offer.totalCents === null || offer.totalCents === undefined) {
+        return null
+      }
+      const advanceBilledCents = this.invoices
+        .filter((invoice) => invoice.relatedOfferId === this.form.relatedOfferId)
+        .filter((invoice) => (invoice.invoiceType || 'standard') === 'advance')
+        .reduce((sum, invoice) => sum + (invoice.totalCents || 0), 0)
+      const currentCents = this.totalCents
+      return {
+        offerTotalCents: offer.totalCents || 0,
+        advanceBilledCents,
+        currentCents,
+        remainingCents: (offer.totalCents || 0) - (advanceBilledCents + currentCents),
+      }
     },
   },
   async mounted() {
@@ -431,14 +555,36 @@ export default {
       if (!value) {
         this.offers = []
         this.selectedOfferId = null
+        this.form.relatedOfferId = null
+        this.invoices = []
         return
       }
       this.loadOffers(value)
+      this.loadInvoices(value)
       if (!this.form.customerId) {
         const item = this.cases.find((entry) => entry.id === value)
         if (item) {
           this.form.customerId = item.customerId
         }
+      }
+    },
+    'form.invoiceType'(value) {
+      if (!['advance', 'final'].includes(value)) {
+        this.form.relatedOfferId = null
+        this.form.servicePeriodStart = null
+        this.form.servicePeriodEnd = null
+      } else {
+        this.applyRelatedOfferDefault()
+      }
+    },
+    'form.relatedOfferId'(value) {
+      if (!value) {
+        return
+      }
+      const offer = this.offers.find((entry) => entry.id === value)
+      if (offer) {
+        this.form.customerId = offer.customerId
+        this.form.caseId = offer.caseId
       }
     },
   },
@@ -488,6 +634,10 @@ export default {
       this.form = {
         customerId: null,
         caseId: null,
+        invoiceType: 'standard',
+        relatedOfferId: null,
+        servicePeriodStart: null,
+        servicePeriodEnd: null,
         issueDate,
         dueDate: paymentTerms > 0 ? addDaysInput(issueDate, paymentTerms) : '',
         greetingText: this.texts?.invoiceGreeting || '',
@@ -510,13 +660,39 @@ export default {
       try {
         const data = await getOffers({ caseId })
         this.offers = Array.isArray(data) ? data : []
+        this.applyRelatedOfferDefault()
       } catch (e) {
         this.offers = []
+      }
+    },
+    async loadInvoices(caseId) {
+      try {
+        const data = await getInvoices({ caseId })
+        this.invoices = Array.isArray(data) ? data : []
+      } catch (e) {
+        this.invoices = []
+      }
+    },
+    applyRelatedOfferDefault() {
+      if (!this.isAdvanceOrFinal) {
+        return
+      }
+      if (this.form.relatedOfferId) {
+        return
+      }
+      const acceptedOffers = this.offers.filter(
+        (offer) => (offer.status || '').toLowerCase() === 'accepted'
+      )
+      if (acceptedOffers.length === 1) {
+        this.form.relatedOfferId = acceptedOffers[0].id
       }
     },
     async applyOffer(offerId) {
       if (!offerId) {
         return
+      }
+      if (this.isAdvanceOrFinal) {
+        this.form.relatedOfferId = offerId
       }
       const offer = this.offers.find((entry) => entry.id === offerId)
       if (offer) {
@@ -613,6 +789,16 @@ export default {
         this.fieldErrors = { customerId: 'Bitte einen Kunden auswählen.' }
         return
       }
+      if (this.form.invoiceType === 'advance') {
+        if (!isValidPickerDate(this.form.servicePeriodStart)) {
+          this.fieldErrors = { servicePeriodStart: 'Bitte einen gültigen Start angeben.' }
+          return
+        }
+        if (!isValidPickerDate(this.form.servicePeriodEnd)) {
+          this.fieldErrors = { servicePeriodEnd: 'Bitte ein gültiges Ende angeben.' }
+          return
+        }
+      }
       if (!this.isValidDateInput(this.form.issueDate)) {
         this.fieldErrors = { issueDate: 'Bitte ein gültiges Ausstellungsdatum angeben.' }
         return
@@ -641,6 +827,10 @@ export default {
         const payload = {
           caseId: this.form.caseId,
           customerId: this.form.customerId,
+          invoiceType: this.form.invoiceType,
+          relatedOfferId: this.form.relatedOfferId,
+          servicePeriodStart: fromPickerDate(this.form.servicePeriodStart),
+          servicePeriodEnd: fromPickerDate(this.form.servicePeriodEnd),
           issueDate: fromDateInput(this.form.issueDate),
           dueDate: fromDateInput(this.form.dueDate),
           greetingText: this.form.greetingText || null,
@@ -683,14 +873,18 @@ export default {
 
         await Promise.all(items.map((item) => createInvoiceItem(invoice.id, item)))
         this.saved = true
-        this.$router.push({
-          name: 'cases',
-          query: {
-            caseId: this.form.caseId,
-            customerId: this.form.customerId,
-            expand: '1',
-          },
-        })
+        if (this.$route.query.returnTo === 'case' && this.form.caseId) {
+          this.$router.push({ name: 'case-detail', params: { id: this.form.caseId } })
+        } else {
+          this.$router.push({
+            name: 'cases',
+            query: {
+              caseId: this.form.caseId,
+              customerId: this.form.customerId,
+              expand: '1',
+            },
+          })
+        }
       } catch (e) {
         const message = e?.response?.data?.message
         this.error = message || 'Rechnung konnte nicht gespeichert werden.'
@@ -699,6 +893,10 @@ export default {
       }
     },
     goBack() {
+      if (this.$route.query.returnTo === 'case' && this.form.caseId) {
+        this.$router.push({ name: 'case-detail', params: { id: this.form.caseId } })
+        return
+      }
       this.$router.push({ name: 'invoices' })
     },
   },
@@ -871,6 +1069,7 @@ export default {
 .error {
   color: var(--color-error, #b91c1c);
 }
+
 
 .field-error {
   color: var(--color-error, #b91c1c);

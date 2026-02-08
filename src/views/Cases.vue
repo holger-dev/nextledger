@@ -1,6 +1,6 @@
 <template>
   <section class="cases">
-    <div class="header">
+    <div v-if="!standalone" class="header">
       <div>
         <h1>Vorgänge</h1>
         <p class="subline">Kompakt, filterbar und pro Vorgang aufklappbar.</p>
@@ -10,8 +10,31 @@
 
     <NcLoadingIcon v-if="loading" />
 
+    <NcModal
+      v-if="showSetupModal"
+      size="normal"
+      :can-close="false"
+      :close-on-click-outside="false"
+    >
+      <div class="modal__content">
+        <h2>Einrichtung erforderlich</h2>
+        <p class="hint">
+          Ohne Firmendaten und ein Wirtschaftsjahr kann nicht gearbeitet werden.
+          Bitte lege beides an, bevor du Vorgänge bearbeitest.
+        </p>
+        <div class="setup-links">
+          <NcButton type="primary" @click="goToCompanySettings">
+            Firmadaten anlegen
+          </NcButton>
+          <NcButton type="secondary" @click="goToFiscalYear">
+            Wirtschaftsjahr anlegen
+          </NcButton>
+        </div>
+      </div>
+    </NcModal>
+
     <div v-else class="content">
-      <div class="filters">
+      <div v-if="!standalone" class="filters">
         <label for="customerFilter">Kunde</label>
         <NcSelect
           id="customerFilter"
@@ -27,13 +50,13 @@
       </div>
 
       <NcEmptyContent
-        v-if="items.length === 0"
+        v-if="itemsToShow.length === 0"
         name="Noch keine Vorgänge"
         description="Lege deinen ersten Vorgang für einen Kunden an."
       />
 
       <div v-else class="case-list">
-        <article v-for="item in items" :key="item.id" class="case-card">
+        <article v-for="item in itemsToShow" :key="item.id" class="case-card">
           <header class="case-header">
             <div>
               <div class="case-title-row">
@@ -46,8 +69,8 @@
               </p>
             </div>
             <div class="case-actions">
-              <NcButton type="tertiary" @click="toggleExpand(item)">
-                {{ expandedId === item.id ? 'Schließen' : 'Öffnen' }}
+              <NcButton v-if="!standalone" type="tertiary" @click="openCaseDetail(item)">
+                Öffnen
               </NcButton>
               <NcButton
                 type="tertiary-no-background"
@@ -72,7 +95,7 @@
             </div>
           </header>
 
-          <div v-if="expandedId === item.id" class="case-detail">
+          <div v-if="standalone" class="case-detail">
             <div class="detail-grid">
             <div>
               <h3>Vorgangsdaten</h3>
@@ -101,7 +124,7 @@
                 <h3>Aktionen</h3>
                 <div class="detail-actions">
                   <NcButton type="primary" @click="openCreateElementModal(item)">
-                    Neues Element
+                    Neue Korrespondenz/Notiz
                   </NcButton>
                   <NcButton type="secondary" @click="openCreateInvoice(item)">
                     Neue Rechnung
@@ -130,6 +153,28 @@
                   <NcButton type="secondary" @click="openCreateInvoice(item)">
                     Neue Rechnung
                   </NcButton>
+                </div>
+              </div>
+
+              <div v-if="showInvoices && acceptedOffers.length" class="billing-summary">
+                <div
+                  v-for="offer in acceptedOffers"
+                  :key="offer.id"
+                  class="billing-summary__item"
+                >
+                  <h4>Auftrag {{ offer.number || 'Angebot' }}</h4>
+                  <p>Auftragssumme: {{ formatPrice(offer.totalCents) }}</p>
+                  <p>Bisher abgerechnet (Abschläge): {{ formatPrice(advanceTotal(offer.id)) }}</p>
+                  <p>Rest: {{ formatPrice(offerRemaining(offer)) }}</p>
+                  <div v-if="advanceInvoices(offer.id).length" class="billing-summary__list">
+                    <p><strong>Abschlagsrechnungen</strong></p>
+                    <ul>
+                      <li v-for="invoice in advanceInvoices(offer.id)" :key="invoice.id">
+                        {{ invoice.number || '–' }} • {{ formatDate(invoice.issueDate) }} •
+                        {{ formatPrice(invoice.totalCents) }}
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
 
@@ -309,7 +354,7 @@
             <div class="elements">
               <div class="list-header">
                 <h3>
-                  Elemente
+                  Korrespondenz/Notizen
                   <span class="section-meta">({{ elements.length }})</span>
                 </h3>
                 <div class="list-actions">
@@ -317,21 +362,21 @@
                     {{ showElements ? 'Schließen' : 'Öffnen' }}
                   </NcButton>
                   <NcButton type="secondary" @click="openCreateElementModal(item)">
-                    Neues Element
+                    Neue Korrespondenz/Notiz
                   </NcButton>
                 </div>
               </div>
 
               <NcEmptyContent
                 v-if="showElements && elements.length === 0 && elementsCaseId === item.id"
-                name="Keine Elemente"
-                description="Füge Elemente zu diesem Vorgang hinzu."
+                name="Keine Korrespondenz/Notizen"
+                description="Füge Korrespondenz/Notizen zu diesem Vorgang hinzu."
               />
 
               <table v-else-if="showElements" class="table">
                 <thead>
                   <tr>
-                    <th>Element</th>
+                    <th>Korrespondenz/Notiz</th>
                     <th>Notiz</th>
                     <th>Anhang</th>
                     <th class="actions">Aktionen</th>
@@ -345,7 +390,7 @@
                     <td class="actions">
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Element bearbeiten"
+                        aria-label="Korrespondenz/Notiz bearbeiten"
                         title="Bearbeiten"
                         @click="openEditElementModal(item, element)"
                       >
@@ -355,7 +400,7 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Element löschen"
+                        aria-label="Korrespondenz/Notiz löschen"
                         title="Löschen"
                         @click="removeElement(element)"
                       >
@@ -426,7 +471,7 @@
 
     <NcModal v-if="showElementModal" size="normal" @close="closeElementModal">
       <div class="modal__content">
-        <h2>{{ editingElementId ? 'Element bearbeiten' : 'Neues Element' }}</h2>
+        <h2>{{ editingElementId ? 'Korrespondenz/Notiz bearbeiten' : 'Neue Korrespondenz/Notiz' }}</h2>
         <p class="subline">Für Vorgang: {{ elementCaseName }}</p>
 
         <div class="form-group">
@@ -479,57 +524,115 @@
     <NcModal v-if="showSendOfferModal" size="normal" @close="closeSendOfferModal">
       <div class="modal__content">
         <h2>Angebot verschicken</h2>
-        <p>
-          Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
-        </p>
-        <p>
-          Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
-        </p>
-        <div class="actions">
-          <NcButton
-            type="primary"
-            :disabled="!canSendOfferEmail"
-            @click="openOfferMailto"
-          >
-            Mailvorlage erstellen
-          </NcButton>
-          <NcButton type="secondary" @click="closeSendOfferModal">Schließen</NcButton>
-        </div>
-        <p class="hint">
-          Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
-        </p>
+        <template v-if="isDirectEmail">
+          <p>Die E-Mail wird direkt über den SMTP-Server versendet.</p>
+          <div class="email-preview">
+            <p><strong>Empfänger:</strong> {{ sendOfferPreview?.to?.join(', ') || '–' }}</p>
+            <p v-if="effectiveFromEmail"><strong>Absender:</strong> {{ effectiveFromEmail }}</p>
+            <p v-if="effectiveReplyToEmail"><strong>Antwort an:</strong> {{ effectiveReplyToEmail }}</p>
+            <p><strong>Betreff:</strong> {{ sendOfferPreview?.subject || '–' }}</p>
+            <p><strong>Anhang:</strong> {{ sendOfferPreview?.attachmentName || '–' }}</p>
+            <pre class="email-body">{{ sendOfferPreview?.body || '' }}</pre>
+          </div>
+          <div class="actions">
+            <NcButton
+              type="primary"
+              :disabled="!canSendOfferEmail || sendingOffer"
+              @click="sendOfferDirect"
+            >
+              E-Mail senden
+            </NcButton>
+            <NcButton type="secondary" @click="closeSendOfferModal">Abbrechen</NcButton>
+            <span v-if="sendingOffer" class="hint">Sende…</span>
+            <span v-if="sentOfferEmail" class="success">Gesendet</span>
+            <span v-if="sendOfferError" class="error">{{ sendOfferError }}</span>
+          </div>
+        </template>
+        <template v-else>
+          <p>
+            Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
+          </p>
+          <p>
+            Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
+          </p>
+          <div class="actions">
+            <NcButton
+              type="primary"
+              :disabled="!canSendOfferEmail"
+              @click="openOfferMailto"
+            >
+              Mailvorlage erstellen
+            </NcButton>
+            <NcButton type="secondary" @click="closeSendOfferModal">Schließen</NcButton>
+          </div>
+          <p class="hint">
+            Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
+          </p>
+        </template>
       </div>
     </NcModal>
 
     <NcModal v-if="showSendInvoiceModal" size="normal" @close="closeSendInvoiceModal">
       <div class="modal__content">
         <h2>Rechnung verschicken</h2>
-        <p>
-          Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
-        </p>
-        <p>
-          Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
-        </p>
-        <div class="actions">
-          <NcButton
-            type="primary"
-            :disabled="!canSendInvoiceEmail"
-            @click="openInvoiceMailto"
-          >
-            Mailvorlage erstellen
-          </NcButton>
-          <NcButton type="secondary" @click="closeSendInvoiceModal">Schließen</NcButton>
-        </div>
-        <p class="hint">
-          Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
-        </p>
+        <template v-if="isDirectEmail">
+          <p>Die E-Mail wird direkt über den SMTP-Server versendet.</p>
+          <div class="email-preview">
+            <p><strong>Empfänger:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
+            <p v-if="effectiveFromEmail"><strong>Absender:</strong> {{ effectiveFromEmail }}</p>
+            <p v-if="effectiveReplyToEmail"><strong>Antwort an:</strong> {{ effectiveReplyToEmail }}</p>
+            <p><strong>Betreff:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
+            <p><strong>Anhang:</strong> {{ sendInvoicePreview?.attachmentName || '–' }}</p>
+            <pre class="email-body">{{ sendInvoicePreview?.body || '' }}</pre>
+          </div>
+          <div class="actions">
+            <NcButton
+              type="primary"
+              :disabled="!canSendInvoiceEmail || sendingInvoice"
+              @click="sendInvoiceDirect"
+            >
+              E-Mail senden
+            </NcButton>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">Abbrechen</NcButton>
+            <span v-if="sendingInvoice" class="hint">Sende…</span>
+            <span v-if="sentInvoiceEmail" class="success">Gesendet</span>
+            <span v-if="sendInvoiceError" class="error">{{ sendInvoiceError }}</span>
+          </div>
+        </template>
+        <template v-else>
+          <p>
+            Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
+          </p>
+          <p>
+            Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
+          </p>
+          <div class="actions">
+            <NcButton
+              type="primary"
+              :disabled="!canSendInvoiceEmail"
+              @click="openInvoiceMailto"
+            >
+              Mailvorlage erstellen
+            </NcButton>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">Schließen</NcButton>
+          </div>
+          <p class="hint">
+            Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
+          </p>
+        </template>
       </div>
     </NcModal>
   </section>
 </template>
 
 <script>
-import { NcButton, NcEmptyContent, NcLoadingIcon, NcModal } from '@nextcloud/vue'
+import {
+  NcButton,
+  NcCheckboxRadioSwitch,
+  NcEmptyContent,
+  NcLoadingIcon,
+  NcModal,
+} from '@nextcloud/vue'
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
@@ -549,14 +652,32 @@ import {
   updateCaseElement,
 } from '../api/caseElements'
 import { getCustomers } from '../api/customers'
-import { deleteInvoice, getInvoicePdfUrl, getInvoices, updateInvoice } from '../api/invoices'
-import { deleteOffer, getOfferPdfUrl, getOffers, updateOffer } from '../api/offers'
-import { getTexts } from '../api/settings'
+import { getFiscalYears } from '../api/fiscalYears'
+import {
+  deleteInvoice,
+  getInvoicePdfUrl,
+  getInvoices,
+  sendInvoiceEmail,
+  updateInvoice,
+} from '../api/invoices'
+import { deleteOffer, getOfferPdfUrl, getOffers, sendOfferEmail, updateOffer } from '../api/offers'
+import { getCompany, getEmailBehavior, getTexts } from '../api/settings'
 
 export default {
   name: 'Cases',
+  props: {
+    standalone: {
+      type: Boolean,
+      default: false,
+    },
+    focusCaseId: {
+      type: [String, Number],
+      default: null,
+    },
+  },
   components: {
     NcButton,
+    NcCheckboxRadioSwitch,
     NcEmptyContent,
     NcLoadingIcon,
     NcModal,
@@ -597,15 +718,24 @@ export default {
       offersCaseId: null,
       offersError: '',
       texts: null,
+      emailBehavior: null,
       showSendOfferModal: false,
       sendOfferTarget: null,
       sendOfferMailto: '',
+      sendOfferPreview: null,
+      sendOfferError: '',
+      sendingOffer: false,
+      sentOfferEmail: false,
       showInvoices: false,
       showOffers: false,
       showElements: false,
       showSendInvoiceModal: false,
       sendInvoiceTarget: null,
       sendInvoiceMailto: '',
+      sendInvoicePreview: null,
+      sendInvoiceError: '',
+      sendingInvoice: false,
+      sentInvoiceEmail: false,
       savingElement: false,
       savedElement: false,
       elementError: '',
@@ -618,6 +748,9 @@ export default {
       },
       elementCaseName: '',
       attachmentUploading: false,
+      showSetupModal: false,
+      companyMissing: false,
+      fiscalYearsMissing: false,
     }
   },
   computed: {
@@ -628,10 +761,27 @@ export default {
       return this.elementForm.name.trim() !== ''
     },
     canSendOfferEmail() {
+      if (this.isDirectEmail) {
+        return !!this.sendOfferPreview?.to?.length
+      }
       return !!this.sendOfferMailto
     },
     canSendInvoiceEmail() {
+      if (this.isDirectEmail) {
+        return !!this.sendInvoicePreview?.to?.length
+      }
       return !!this.sendInvoiceMailto
+    },
+    isDirectEmail() {
+      return this.emailBehavior?.mode === 'direct'
+    },
+    effectiveFromEmail() {
+      const stored = (this.emailBehavior?.fromEmail || '').trim()
+      return stored || this.emailBehavior?.defaultFromEmail || ''
+    },
+    effectiveReplyToEmail() {
+      const stored = (this.emailBehavior?.replyToEmail || '').trim()
+      return stored || this.emailBehavior?.defaultReplyToEmail || ''
     },
     customerOptions() {
       return this.customers.map((customer) => ({
@@ -654,6 +804,16 @@ export default {
     invoiceRevenueCents() {
       return this.invoices.reduce((sum, invoice) => sum + (invoice.totalCents || 0), 0)
     },
+    acceptedOffers() {
+      return this.offers.filter((offer) => (offer.status || '').toLowerCase() === 'accepted')
+    },
+    itemsToShow() {
+      if (!this.standalone || !this.focusCaseId) {
+        return this.items
+      }
+      const focusId = Number(this.focusCaseId)
+      return this.items.filter((item) => item.id === focusId)
+    },
   },
   watch: {
     filterCustomerId() {
@@ -661,15 +821,48 @@ export default {
     },
     '$route.query.caseId': {
       handler() {
-        this.applyRouteExpand()
+        if (!this.standalone) {
+          this.applyRouteExpand()
+        }
       },
+    },
+    focusCaseId() {
+      if (this.standalone) {
+        this.applyStandaloneFocus()
+      }
     },
   },
   async mounted() {
     await this.loadAll()
-    await this.applyRouteExpand()
+    if (this.standalone) {
+      await this.applyStandaloneFocus()
+    } else {
+      await this.applyRouteExpand()
+    }
   },
   methods: {
+    async applyStandaloneFocus() {
+      if (!this.focusCaseId) {
+        return
+      }
+      const focusId = Number(this.focusCaseId)
+      if (this.items.length === 0) {
+        await this.loadCases()
+      }
+      const item = this.items.find((entry) => entry.id === focusId)
+      if (!item) {
+        return
+      }
+      this.expandedId = focusId
+      this.showInvoices = false
+      this.showOffers = false
+      this.showElements = false
+      await Promise.all([
+        this.loadElements(focusId),
+        this.loadInvoices(focusId),
+        this.loadOffers(focusId),
+      ])
+    },
     async applyRouteExpand() {
       const { caseId, customerId, expand } = this.$route.query || {}
       if (!caseId) {
@@ -705,14 +898,19 @@ export default {
       this.loading = true
       this.error = ''
       try {
-        const [customers, cases, texts] = await Promise.all([
+        const [customers, cases, texts, emailBehavior, company, fiscalYears] = await Promise.all([
           getCustomers(),
           getCases(this.filterCustomerId),
           getTexts(),
+          getEmailBehavior(),
+          getCompany(),
+          getFiscalYears(),
         ])
         this.customers = Array.isArray(customers) ? customers : []
         this.items = Array.isArray(cases) ? cases : []
         this.texts = texts || {}
+        this.emailBehavior = emailBehavior || { mode: 'manual' }
+        this.updateSetupState(company, fiscalYears)
       } catch (e) {
         this.error = 'Vorgänge konnten nicht geladen werden.'
       } finally {
@@ -748,7 +946,7 @@ export default {
         const data = await getCaseElements(caseId)
         this.elements = Array.isArray(data) ? data : []
       } catch (e) {
-        this.elementError = 'Elemente konnten nicht geladen werden.'
+        this.elementError = 'Korrespondenz/Notizen konnten nicht geladen werden.'
       }
     },
     async loadInvoices(caseId) {
@@ -818,12 +1016,16 @@ export default {
       this.resetForm()
       this.showCaseModal = true
     },
+    openCaseDetail(item) {
+      this.$router.push({ name: 'case-detail', params: { id: item.id } })
+    },
     openCreateInvoice(item) {
       this.$router.push({
         name: 'invoices-new',
         query: {
           caseId: item.id,
           customerId: item.customerId,
+          returnTo: this.standalone ? 'case' : '',
         },
       })
     },
@@ -833,6 +1035,7 @@ export default {
         query: {
           caseId: item.id,
           customerId: item.customerId,
+          returnTo: this.standalone ? 'case' : '',
         },
       })
     },
@@ -840,12 +1043,18 @@ export default {
       this.$router.push({
         name: 'invoices-edit',
         params: { id: invoice.id },
+        query: this.standalone
+          ? { returnTo: 'case', caseId: invoice.caseId }
+          : {},
       })
     },
     openEditOffer(offer) {
       this.$router.push({
         name: 'offers-edit',
         params: { id: offer.id },
+        query: this.standalone
+          ? { returnTo: 'case', caseId: offer.caseId }
+          : {},
       })
     },
     async markInvoicePaid(invoice) {
@@ -857,6 +1066,10 @@ export default {
         status: 'paid',
         caseId: invoice.caseId ?? null,
         customerId: invoice.customerId ?? null,
+        invoiceType: invoice.invoiceType || 'standard',
+        relatedOfferId: invoice.relatedOfferId || null,
+        servicePeriodStart: invoice.servicePeriodStart || null,
+        servicePeriodEnd: invoice.servicePeriodEnd || null,
         issueDate: invoice.issueDate ?? null,
         dueDate: invoice.dueDate ?? null,
         greetingText: invoice.greetingText ?? null,
@@ -894,9 +1107,18 @@ export default {
     },
     openSendOfferModal(offer) {
       this.sendOfferTarget = offer
-      this.sendOfferMailto = this.buildMailtoLink(offer)
-      const pdfUrl = getOfferPdfUrl(offer.id)
-      window.open(pdfUrl, '_blank')
+      this.sendOfferError = ''
+      this.sentOfferEmail = false
+      const emailData = this.buildOfferEmailData(offer)
+      this.sendOfferPreview = {
+        ...emailData,
+        attachmentName: this.buildOfferAttachmentName(offer),
+      }
+      this.sendOfferMailto = this.buildOfferMailtoFromData(emailData)
+      if (!this.isDirectEmail) {
+        const pdfUrl = getOfferPdfUrl(offer.id)
+        window.open(pdfUrl, '_blank')
+      }
       this.showSendOfferModal = true
       if ((offer.status || '').toLowerCase() !== 'sent') {
         this.markOfferSent(offer)
@@ -906,6 +1128,10 @@ export default {
       this.showSendOfferModal = false
       this.sendOfferTarget = null
       this.sendOfferMailto = ''
+      this.sendOfferPreview = null
+      this.sendOfferError = ''
+      this.sendingOffer = false
+      this.sentOfferEmail = false
     },
     openOfferMailto() {
       if (!this.sendOfferMailto) {
@@ -919,15 +1145,28 @@ export default {
     },
     openSendInvoiceModal(invoice) {
       this.sendInvoiceTarget = invoice
-      this.sendInvoiceMailto = this.buildInvoiceMailto(invoice)
-      const pdfUrl = getInvoicePdfUrl(invoice.id)
-      window.open(pdfUrl, '_blank')
+      this.sendInvoiceError = ''
+      this.sentInvoiceEmail = false
+      const emailData = this.buildInvoiceEmailData(invoice)
+      this.sendInvoicePreview = {
+        ...emailData,
+        attachmentName: this.buildInvoiceAttachmentName(invoice),
+      }
+      this.sendInvoiceMailto = this.buildInvoiceMailtoFromData(emailData)
+      if (!this.isDirectEmail) {
+        const pdfUrl = getInvoicePdfUrl(invoice.id)
+        window.open(pdfUrl, '_blank')
+      }
       this.showSendInvoiceModal = true
     },
     closeSendInvoiceModal() {
       this.showSendInvoiceModal = false
       this.sendInvoiceTarget = null
       this.sendInvoiceMailto = ''
+      this.sendInvoicePreview = null
+      this.sendInvoiceError = ''
+      this.sendingInvoice = false
+      this.sentInvoiceEmail = false
     },
     openInvoiceMailto() {
       if (!this.sendInvoiceMailto) {
@@ -935,7 +1174,14 @@ export default {
       }
       window.location.href = this.sendInvoiceMailto
     },
-    buildMailtoLink(offer) {
+    buildOfferMailtoFromData(data) {
+      const to = data.to.join(',')
+      const subject = encodeURIComponent(data.subject)
+      const body = encodeURIComponent(data.body)
+      const base = to ? `mailto:${to}` : 'mailto:'
+      return `${base}?subject=${subject}&body=${body}`
+    },
+    buildOfferEmailData(offer) {
       const customer = this.customers.find((entry) => entry.id === offer.customerId)
       const caseItem = this.items.find((entry) => entry.id === offer.caseId)
       const contact = (customer?.contactName || '').trim()
@@ -957,13 +1203,48 @@ export default {
         this.texts?.offerEmailBody ||
         '{{customerSalutation}},\n\nanbei das Angebot {{offerNumber}}.\n\nViele Grüße'
 
-      const to = customer?.email || ''
-      const subject = encodeURIComponent(this.applyTemplate(subjectTemplate, context))
-      const body = encodeURIComponent(this.applyTemplate(bodyTemplate, context))
+      const to = customer?.email ? [customer.email] : []
+      return {
+        to,
+        subject: this.applyTemplate(subjectTemplate, context),
+        body: this.applyTemplate(bodyTemplate, context),
+      }
+    },
+    buildOfferAttachmentName(offer) {
+      const suffix = offer.number || offer.id
+      return `angebot-${suffix}.pdf`
+    },
+    async sendOfferDirect() {
+      if (!this.sendOfferTarget || !this.sendOfferPreview) {
+        return
+      }
+      this.sendingOffer = true
+      this.sendOfferError = ''
+      this.sentOfferEmail = false
+      try {
+        await sendOfferEmail(this.sendOfferTarget.id, {
+          to: this.sendOfferPreview.to,
+          subject: this.sendOfferPreview.subject,
+          body: this.sendOfferPreview.body,
+        })
+        this.sentOfferEmail = true
+        window.setTimeout(() => {
+          this.closeSendOfferModal()
+        }, 700)
+      } catch (e) {
+        this.sendOfferError = 'E-Mail konnte nicht gesendet werden.'
+      } finally {
+        this.sendingOffer = false
+      }
+    },
+    buildInvoiceMailtoFromData(data) {
+      const to = data.to.join(',')
+      const subject = encodeURIComponent(data.subject)
+      const body = encodeURIComponent(data.body)
       const base = to ? `mailto:${to}` : 'mailto:'
       return `${base}?subject=${subject}&body=${body}`
     },
-    buildInvoiceMailto(invoice) {
+    buildInvoiceEmailData(invoice) {
       const customer = this.customers.find((entry) => entry.id === invoice.customerId)
       const caseItem = this.items.find((entry) => entry.id === invoice.caseId)
       const contact = (customer?.contactName || '').trim()
@@ -985,11 +1266,74 @@ export default {
         this.texts?.invoiceEmailBody ||
         '{{customerSalutation}},\n\nanbei die Rechnung {{invoiceNumber}}.\n\nViele Grüße'
 
-      const to = customer?.email || ''
-      const subject = encodeURIComponent(this.applyTemplate(subjectTemplate, context))
-      const body = encodeURIComponent(this.applyTemplate(bodyTemplate, context))
-      const base = to ? `mailto:${to}` : 'mailto:'
-      return `${base}?subject=${subject}&body=${body}`
+      const recipients = this.buildInvoiceRecipients(caseItem, customer)
+      return {
+        to: recipients,
+        subject: this.applyTemplate(subjectTemplate, context),
+        body: this.applyTemplate(bodyTemplate, context),
+      }
+    },
+    buildInvoiceAttachmentName(invoice) {
+      const suffix = invoice.number || invoice.id
+      return `rechnung-${suffix}.pdf`
+    },
+    async sendInvoiceDirect() {
+      if (!this.sendInvoiceTarget || !this.sendInvoicePreview) {
+        return
+      }
+      this.sendingInvoice = true
+      this.sendInvoiceError = ''
+      this.sentInvoiceEmail = false
+      try {
+        await sendInvoiceEmail(this.sendInvoiceTarget.id, {
+          to: this.sendInvoicePreview.to,
+          subject: this.sendInvoicePreview.subject,
+          body: this.sendInvoicePreview.body,
+        })
+        this.sentInvoiceEmail = true
+        window.setTimeout(() => {
+          this.closeSendInvoiceModal()
+        }, 700)
+      } catch (e) {
+        this.sendInvoiceError = 'E-Mail konnte nicht gesendet werden.'
+      } finally {
+        this.sendingInvoice = false
+      }
+    },
+    buildInvoiceRecipients(caseItem, customer) {
+      const billingEmail = (customer?.billingEmail || '').trim()
+      const contactEmail = (customer?.email || '').trim()
+      const recipientState = this.getInvoiceRecipientFlags(customer)
+      const recipients = []
+      if (recipientState.sendInvoiceToBillingEmail && billingEmail) {
+        recipients.push(billingEmail)
+      }
+      if (recipientState.sendInvoiceToContactEmail && contactEmail) {
+        recipients.push(contactEmail)
+      }
+      return recipients
+    },
+    getInvoiceRecipientFlags(customer) {
+      if (
+        customer &&
+        ((customer.sendInvoiceToBillingEmail !== null &&
+          customer.sendInvoiceToBillingEmail !== undefined) ||
+          (customer.sendInvoiceToContactEmail !== null &&
+            customer.sendInvoiceToContactEmail !== undefined))
+      ) {
+        return {
+          sendInvoiceToBillingEmail: !!customer.sendInvoiceToBillingEmail,
+          sendInvoiceToContactEmail: !!customer.sendInvoiceToContactEmail,
+        }
+      }
+      return this.getInvoiceRecipientDefaults(customer)
+    },
+    getInvoiceRecipientDefaults(customer) {
+      const billingEmail = (customer?.billingEmail || '').trim()
+      return {
+        sendInvoiceToBillingEmail: !!billingEmail,
+        sendInvoiceToContactEmail: !billingEmail,
+      }
     },
     applyTemplate(template, context) {
       return Object.entries(context).reduce(
@@ -1010,6 +1354,7 @@ export default {
     },
     openEditModal(item) {
       this.editingId = item.id
+      const customer = this.customers.find((entry) => entry.id === item.customerId)
       this.form = {
         customerId: item.customerId ? String(item.customerId) : '',
         name: item.name || '',
@@ -1134,6 +1479,35 @@ export default {
       }
       return status || '–'
     },
+    normalizeInvoiceType(value) {
+      const normalized = (value || '').toString().toLowerCase()
+      if (normalized === 'advance') {
+        return 'advance'
+      }
+      if (normalized === 'final') {
+        return 'final'
+      }
+      return 'standard'
+    },
+    advanceInvoices(offerId) {
+      return this.invoices.filter(
+        (invoice) =>
+          invoice.relatedOfferId === offerId &&
+          this.normalizeInvoiceType(invoice.invoiceType) === 'advance'
+      )
+    },
+    advanceTotal(offerId) {
+      return this.advanceInvoices(offerId).reduce(
+        (sum, invoice) => sum + (invoice.totalCents || 0),
+        0
+      )
+    },
+    offerRemaining(offer) {
+      if (!offer || offer.totalCents === null || offer.totalCents === undefined) {
+        return null
+      }
+      return offer.totalCents - this.advanceTotal(offer.id)
+    },
     openCreateElementModal(item) {
       this.editingElementId = null
       this.elementForm = {
@@ -1188,7 +1562,7 @@ export default {
         return
       }
       if (!this.canSaveElement) {
-        this.elementError = 'Bitte einen Element-Namen angeben.'
+        this.elementError = 'Bitte einen Namen angeben.'
         return
       }
 
@@ -1298,6 +1672,43 @@ export default {
 
       return `/NextLedger/${file.name}`
     },
+    updateSetupState(company, fiscalYears) {
+      const hasCompanyData = this.hasCompanyData(company)
+      const hasFiscalYears = Array.isArray(fiscalYears) && fiscalYears.length > 0
+      this.companyMissing = !hasCompanyData
+      this.fiscalYearsMissing = !hasFiscalYears
+      this.showSetupModal = this.companyMissing && this.fiscalYearsMissing
+    },
+    hasCompanyData(company) {
+      if (!company) {
+        return false
+      }
+      const fields = [
+        company.name,
+        company.ownerName,
+        company.street,
+        company.houseNumber,
+        company.zip,
+        company.city,
+        company.email,
+        company.phone,
+        company.vatId,
+        company.taxId,
+      ]
+      return fields.some((value) => String(value || '').trim() !== '')
+    },
+    handleSetupClose() {
+      if (this.showSetupModal) {
+        return
+      }
+      this.showSetupModal = false
+    },
+    goToCompanySettings() {
+      this.$router.push({ name: 'settings-company' })
+    },
+    goToFiscalYear() {
+      this.$router.push({ name: 'fiscal-year' })
+    },
     getCurrentUserId() {
       if (window?.OC?.getCurrentUser) {
         const user = window.OC.getCurrentUser()
@@ -1309,7 +1720,7 @@ export default {
       return head?.getAttribute('data-user') || ''
     },
     async removeElement(element) {
-      if (!window.confirm('Element wirklich löschen?')) {
+      if (!window.confirm('Korrespondenz/Notiz wirklich löschen?')) {
         return
       }
       this.savingElement = true
@@ -1497,6 +1908,24 @@ export default {
   gap: 6px;
 }
 
+.billing-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--color-background-dark, #f3f4f6);
+  border-radius: 8px;
+}
+
+.billing-summary__item h4 {
+  margin: 0 0 4px;
+}
+
+.billing-summary__list ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
 .list-header {
   display: flex;
   align-items: center;
@@ -1594,6 +2023,30 @@ export default {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.setup-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.email-preview {
+  background: var(--color-background-dark, #f3f4f6);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.email-body {
+  white-space: pre-wrap;
+  background: var(--color-main-background, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+  max-height: 200px;
+  overflow: auto;
 }
 
 .filters :deep(.v-select),

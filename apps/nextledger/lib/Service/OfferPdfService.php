@@ -20,6 +20,10 @@ use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\IConfig;
+use OCP\IUserSession;
+use DateTimeImmutable;
+use DateTimeZone;
 use RuntimeException;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -33,6 +37,8 @@ class OfferPdfService {
         private TextsMapper $textsMapper,
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
+        private IConfig $config,
+        private IUserSession $userSession,
     ) {}
 
     /**
@@ -87,8 +93,8 @@ class OfferPdfService {
         ?TaxSetting $tax,
         ?MiscSetting $misc,
     ): string {
-        $issueDate = $offer->getIssueDate() ? date('d.m.Y', $offer->getIssueDate()) : '–';
-        $validUntil = $offer->getValidUntil() ? date('d.m.Y', $offer->getValidUntil()) : '–';
+        $issueDate = $this->formatDate($offer->getIssueDate());
+        $validUntil = $this->formatDate($offer->getValidUntil());
 
         $companyBlock = $company
             ? sprintf(
@@ -252,5 +258,32 @@ class OfferPdfService {
     private function loadMisc(): ?MiscSetting {
         $items = $this->miscSettingMapper->findAll(1, 0);
         return $items[0] ?? null;
+    }
+
+    private function formatDate(?int $value): string {
+        if (!$value) {
+            return '–';
+        }
+
+        $timezone = $this->getUserTimezone();
+        try {
+            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone($timezone));
+        } catch (\Throwable $e) {
+            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone('UTC'));
+        }
+
+        return $date->format('d.m.Y');
+    }
+
+    private function getUserTimezone(): string {
+        $user = $this->userSession->getUser();
+        if ($user && method_exists($user, 'getUID')) {
+            $timezone = (string)$this->config->getUserValue($user->getUID(), 'core', 'timezone', 'UTC');
+            if ($timezone !== '') {
+                return $timezone;
+            }
+        }
+
+        return 'UTC';
     }
 }

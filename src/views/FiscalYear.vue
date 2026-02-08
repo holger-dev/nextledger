@@ -231,20 +231,22 @@
           <p v-if="yearFieldErrors.name" class="field-error">{{ yearFieldErrors.name }}</p>
         </div>
         <div class="form-group">
-          <NcTextField
+          <NcDateTimePickerNative
             label="Datum von *"
-            type="text"
-            placeholder="YYYY-MM-DD"
-            :value.sync="form.dateStart"
+            type="date"
+            id="fiscal-year-date-start"
+            :value="form.dateStart"
+            @input="form.dateStart = $event"
           />
           <p v-if="yearFieldErrors.dateStart" class="field-error">{{ yearFieldErrors.dateStart }}</p>
         </div>
         <div class="form-group">
-          <NcTextField
+          <NcDateTimePickerNative
             label="Datum bis *"
-            type="text"
-            placeholder="YYYY-MM-DD"
-            :value.sync="form.dateEnd"
+            type="date"
+            id="fiscal-year-date-end"
+            :value="form.dateEnd"
+            @input="form.dateEnd = $event"
           />
           <p v-if="yearFieldErrors.dateEnd" class="field-error">{{ yearFieldErrors.dateEnd }}</p>
         </div>
@@ -282,11 +284,12 @@
             <p v-if="expenseFieldErrors.name" class="field-error">{{ expenseFieldErrors.name }}</p>
           </div>
           <div class="form-group">
-            <NcTextField
+            <NcDateTimePickerNative
               label="Datum *"
-              type="text"
-              placeholder="YYYY-MM-DD"
-              :value.sync="expenseForm.bookedAt"
+              type="date"
+              id="fiscal-year-expense-date"
+              :value="expenseForm.bookedAt"
+              @input="expenseForm.bookedAt = $event"
             />
             <p v-if="expenseFieldErrors.bookedAt" class="field-error">{{ expenseFieldErrors.bookedAt }}</p>
           </div>
@@ -326,6 +329,7 @@ import {
   NcModal,
 } from '@nextcloud/vue'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
+import NcDateTimePickerNative from '@nextcloud/vue/dist/Components/NcDateTimePickerNative.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import CheckCircleOutline from 'vue-material-design-icons/CheckCircleOutline.vue'
 import FileDocumentOutline from 'vue-material-design-icons/FileDocumentOutline.vue'
@@ -346,23 +350,38 @@ const toTimestamp = (value) => {
   if (!value) {
     return null
   }
-  const date = new Date(`${value}T00:00:00`)
-  const time = date.getTime()
-  if (Number.isNaN(time)) {
-    return null
+  if (value instanceof Date) {
+    const time = value.getTime()
+    if (Number.isNaN(time)) {
+      return null
+    }
+    return Math.floor(time / 1000)
   }
-  return Math.floor(time / 1000)
+  if (typeof value === 'string') {
+    const date = new Date(`${value}T00:00:00`)
+    const time = date.getTime()
+    if (Number.isNaN(time)) {
+      return null
+    }
+    return Math.floor(time / 1000)
+  }
+  return null
 }
 
-const toInputDate = (value) => {
+const toDateFromTimestamp = (value) => {
   if (!value) {
-    return ''
+    return null
   }
   const date = new Date(Number(value) * 1000)
   if (Number.isNaN(date.getTime())) {
-    return ''
+    return null
   }
-  return date.toISOString().slice(0, 10)
+  return date
+}
+
+const todayDate = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
 }
 
 export default {
@@ -373,6 +392,7 @@ export default {
     NcEmptyContent,
     NcLoadingIcon,
     NcModal,
+    NcDateTimePickerNative,
     NcTextArea,
     NcTextField,
     CheckCircleOutline,
@@ -402,15 +422,15 @@ export default {
       showModal: false,
       form: {
         name: '',
-        dateStart: '',
-        dateEnd: '',
+        dateStart: null,
+        dateEnd: null,
         isActive: false,
       },
       yearFieldErrors: {},
       expenseForm: {
         name: '',
         description: '',
-        bookedAt: '',
+        bookedAt: null,
         amount: '',
       },
       expenseFieldErrors: {},
@@ -420,8 +440,8 @@ export default {
     canSave() {
       return (
         this.form.name.trim() !== '' &&
-        this.form.dateStart !== '' &&
-        this.form.dateEnd !== ''
+        this.form.dateStart instanceof Date &&
+        this.form.dateEnd instanceof Date
       )
     },
     filteredItems() {
@@ -450,7 +470,7 @@ export default {
     canSaveExpense() {
       return (
         this.expenseForm.name.trim() !== '' &&
-        this.expenseForm.bookedAt !== '' &&
+        this.expenseForm.bookedAt instanceof Date &&
         this.expenseForm.amount !== ''
       )
     },
@@ -486,8 +506,8 @@ export default {
       this.editingId = null
       this.form = {
         name: '',
-        dateStart: '',
-        dateEnd: '',
+        dateStart: null,
+        dateEnd: null,
         isActive: false,
       }
       this.yearFieldErrors = {}
@@ -546,8 +566,8 @@ export default {
       this.editingId = item.id
       this.form = {
         name: item.name,
-        dateStart: toInputDate(item.dateStart),
-        dateEnd: toInputDate(item.dateEnd),
+        dateStart: toDateFromTimestamp(item.dateStart),
+        dateEnd: toDateFromTimestamp(item.dateEnd),
         isActive: Boolean(item.isActive),
       }
       this.error = ''
@@ -559,7 +579,7 @@ export default {
       this.expenseForm = {
         name: '',
         description: '',
-        bookedAt: new Date().toISOString().slice(0, 10),
+        bookedAt: todayDate(),
         amount: '',
       }
       this.expenseFieldErrors = {}
@@ -572,7 +592,7 @@ export default {
       this.expenseForm = {
         name: '',
         description: '',
-        bookedAt: '',
+        bookedAt: null,
         amount: '',
       }
       this.expenseFieldErrors = {}
@@ -584,7 +604,7 @@ export default {
       this.expenseForm = {
         name: expense.name || '',
         description: expense.description || '',
-        bookedAt: toInputDate(expense.bookedAt),
+        bookedAt: toDateFromTimestamp(expense.bookedAt),
         amount: expense.amountCents ? (expense.amountCents / 100).toFixed(2) : '',
       }
       this.expenseFieldErrors = {}
@@ -678,6 +698,10 @@ export default {
           status: 'paid',
           caseId: invoice.caseId,
           customerId: invoice.customerId,
+          invoiceType: invoice.invoiceType || 'standard',
+          relatedOfferId: invoice.relatedOfferId || null,
+          servicePeriodStart: invoice.servicePeriodStart || null,
+          servicePeriodEnd: invoice.servicePeriodEnd || null,
           issueDate: invoice.issueDate,
           dueDate: invoice.dueDate,
           greetingText: invoice.greetingText || null,

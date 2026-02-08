@@ -1,38 +1,38 @@
 <template>
-  <NcAppContent>
-    <template #list>
-      <NcAppNavigation>
-        <NcAppNavigationItem :to="{ name: 'cases' }" name="Vorgänge" />
-        <NcAppNavigationItem :to="{ name: 'invoices' }" name="Rechnungen" />
-        <NcAppNavigationItem :to="{ name: 'offers' }" name="Angebote" />
-        <NcAppNavigationSpacer />
-        <NcAppNavigationItem :to="{ name: 'products' }" name="Produkte/DL" />
-        <NcAppNavigationItem :to="{ name: 'customers' }" name="Kunden" />
-        <NcAppNavigationItem :to="{ name: 'fiscal-year' }" name="Wirtschaftsjahr" />
+  <NcContent app-name="nextledger">
+    <NcAppNavigation>
+      <NcAppNavigationItem :to="{ name: 'cases' }" name="Vorgänge" />
+      <NcAppNavigationItem :to="{ name: 'invoices' }" name="Rechnungen" />
+      <NcAppNavigationItem :to="{ name: 'offers' }" name="Angebote" />
+      <NcAppNavigationSpacer />
+      <NcAppNavigationItem :to="{ name: 'products' }" name="Produkte/DL" />
+      <NcAppNavigationItem :to="{ name: 'customers' }" name="Kunden" />
+      <NcAppNavigationItem :to="{ name: 'fiscal-year' }" name="Wirtschaftsjahr" />
 
-        <NcAppNavigationSpacer />
-        <NcAppNavigationSettings name="Einstellungen">
-          <NcAppNavigationItem :to="{ name: 'settings-company' }" name="Firma" />
-          <NcAppNavigationItem :to="{ name: 'settings-texts' }" name="Texte" />
-          <NcAppNavigationItem :to="{ name: 'settings-tax' }" name="Steuer" />
-          <NcAppNavigationItem :to="{ name: 'settings-misc' }" name="Weiteres" />
-        </NcAppNavigationSettings>
+      <NcAppNavigationSpacer />
+      <NcAppNavigationSettings name="Einstellungen">
+        <NcAppNavigationItem :to="{ name: 'settings-company' }" name="Firma" />
+        <NcAppNavigationItem :to="{ name: 'settings-texts' }" name="Texte" />
+        <NcAppNavigationItem :to="{ name: 'settings-tax' }" name="Steuer" />
+        <NcAppNavigationItem :to="{ name: 'settings-misc' }" name="Kontodaten" />
+        <NcAppNavigationItem :to="{ name: 'settings-email' }" name="E-Mailverhalten" />
+      </NcAppNavigationSettings>
 
-        <NcAppNavigationSpacer />
-        <NcAppNavigationItem :to="{ name: 'settings-help' }" name="Hilfe" />
-      </NcAppNavigation>
-    </template>
+      <NcAppNavigationSpacer />
+      <NcAppNavigationItem :to="{ name: 'settings-help' }" name="Hilfe" />
+    </NcAppNavigation>
 
-    <template #default>
+    <NcAppContent>
       <div class="nextledger-content">
         <router-view />
       </div>
-    </template>
-  </NcAppContent>
+    </NcAppContent>
+  </NcContent>
 </template>
 
 <script>
 import {
+  NcContent,
   NcAppContent,
   NcAppNavigation,
   NcAppNavigationItem,
@@ -43,6 +43,7 @@ import NcAppNavigationSpacer from '@nextcloud/vue/dist/Components/NcAppNavigatio
 export default {
   name: 'NextLedgerApp',
   components: {
+    NcContent,
     NcAppContent,
     NcAppNavigation,
     NcAppNavigationItem,
@@ -55,6 +56,42 @@ export default {
 <style scoped>
 .nextledger-content {
   padding: 24px;
+}
+
+:global(.app-nextledger.content) {
+  margin: 0;
+  margin-top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+:global(.app-nextledger.content:not(.with-sidebar--full)) {
+  position: initial;
+}
+
+:global(.nextledger-content .header > div:first-child) {
+  padding-left: 28px;
+}
+
+:global(.nextledger-content .header h1) {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+:global(.nextledger-content > section > h1:first-child) {
+  padding-left: 28px;
+  font-size: 28px;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+
+:global(.nextledger-content > section > h1:first-child + .subline) {
+  padding-left: 28px;
+}
+
+:global(.nextledger-content .header .subline) {
+  margin-left: 0;
 }
 
 .app-navigation-spacer {

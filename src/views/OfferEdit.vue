@@ -11,15 +11,23 @@
     <NcLoadingIcon v-if="loading" />
 
     <div v-else class="content">
-      <div class="form-grid">
-        <div class="form-group">
+      <div class="section-header">
+        <button class="toggle" type="button" @click="toggleGeneral">
+          <span>Allgemeine Einstellungen</span>
+          <span class="toggle__state">{{ showGeneral ? 'Ausblenden' : 'Einblenden' }}</span>
+        </button>
+      </div>
+
+      <div v-if="showGeneral" class="general">
+        <div class="form-grid">
+          <div class="form-group">
           <NcTextField
             label="Angebotsnummer"
             :value.sync="form.number"
             :disabled="true"
           />
-        </div>
-        <div class="form-group">
+          </div>
+          <div class="form-group">
           <NcSelect
             id="offerCustomer"
             v-model="form.customerId"
@@ -32,8 +40,8 @@
             placeholder="Bitte auswählen"
           />
           <p v-if="fieldErrors.customerId" class="field-error">{{ fieldErrors.customerId }}</p>
-        </div>
-        <div class="form-group">
+          </div>
+          <div class="form-group">
           <NcSelect
             id="offerCase"
             v-model="form.caseId"
@@ -46,8 +54,22 @@
             placeholder="Optional"
           />
           <p v-if="fieldErrors.caseId" class="field-error">{{ fieldErrors.caseId }}</p>
-        </div>
-        <div class="form-group">
+          </div>
+          <div class="form-group">
+          <NcSelect
+            id="offerStatus"
+            v-model="form.status"
+            :options="statusOptions"
+            :reduce="(option) => option.value"
+            :append-to-body="false"
+            :clearable="false"
+            input-label="Status"
+            :label-outside="true"
+            placeholder="Status"
+          />
+          <p class="field-hint">Entwurf, gesendet oder angenommen.</p>
+          </div>
+          <div class="form-group">
           <NcTextField
             label="Ausstellungsdatum *"
             type="text"
@@ -55,8 +77,8 @@
             :value.sync="form.issueDate"
           />
           <p v-if="fieldErrors.issueDate" class="field-error">{{ fieldErrors.issueDate }}</p>
-        </div>
-        <div class="form-group">
+          </div>
+          <div class="form-group">
           <NcTextField
             label="Gültig bis"
             type="text"
@@ -64,17 +86,18 @@
             :value.sync="form.validUntil"
           />
           <p v-if="fieldErrors.validUntil" class="field-error">{{ fieldErrors.validUntil }}</p>
+          </div>
         </div>
-      </div>
 
-      <div class="form-group">
-        <NcTextArea label="Begrüßungstext" :value.sync="form.greetingText" />
-      </div>
-      <div class="form-group">
-        <NcTextArea label="Zusatztext" :value.sync="form.extraText" />
-      </div>
-      <div class="form-group">
-        <NcTextArea label="Footer-Text" :value.sync="form.footerText" />
+        <div class="form-group">
+          <NcTextArea label="Begrüßungstext" :value.sync="form.greetingText" />
+        </div>
+        <div class="form-group">
+          <NcTextArea label="Zusatztext" :value.sync="form.extraText" />
+        </div>
+        <div class="form-group">
+          <NcTextArea label="Footer-Text" :value.sync="form.footerText" />
+        </div>
       </div>
 
       <div class="positions">
@@ -166,20 +189,22 @@
         </table>
       </div>
 
-        <div class="summary">
-          <div>
-            <p>Zwischensumme: {{ formatPrice(subtotalCents) }}</p>
-            <p v-if="form.isSmallBusiness">
-              {{ smallBusinessNote }}
-            </p>
-            <p v-else>
-              Steuer ({{ formatTaxRate(form.taxRateBp) }}): {{ formatPrice(taxCents) }}
-            </p>
+      <div class="summary">
+        <div>
+          <p>Zwischensumme: {{ formatPrice(subtotalCents) }}</p>
+          <p v-if="form.isSmallBusiness">
+            {{ smallBusinessNote }}
+          </p>
+          <p v-else>
+            Steuer ({{ formatTaxRate(form.taxRateBp) }}): {{ formatPrice(taxCents) }}
+          </p>
         </div>
         <div class="total">
           Gesamt: {{ formatPrice(totalCents) }}
         </div>
       </div>
+
+      <hr class="divider" />
 
       <div class="actions">
         <NcButton type="primary" :disabled="saving || !canSave" @click="save">
@@ -227,7 +252,8 @@ const toDateInput = (timestamp) => {
     return ''
   }
   const date = new Date(timestamp * 1000)
-  return date.toISOString().slice(0, 10)
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
 const fromDateInput = (value) => {
@@ -235,7 +261,8 @@ const fromDateInput = (value) => {
     return null
   }
   const date = new Date(`${value}T00:00:00`)
-  return Math.floor(date.getTime() / 1000)
+  const utcSeconds = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 1000
+  return Math.floor(utcSeconds)
 }
 
 const createEmptyItem = () => ({
@@ -270,10 +297,12 @@ export default {
       texts: null,
       tax: null,
       offerItems: [],
+      showGeneral: false,
       form: {
         number: '',
         customerId: null,
         caseId: null,
+        status: 'draft',
         issueDate: '',
         validUntil: '',
         greetingText: '',
@@ -321,6 +350,13 @@ export default {
       return [
         { label: 'Produkt/DL', value: 'product' },
         { label: 'Freie Position', value: 'custom' },
+      ]
+    },
+    statusOptions() {
+      return [
+        { label: 'Entwurf', value: 'draft' },
+        { label: 'Versendet', value: 'sent' },
+        { label: 'Angenommen', value: 'accepted' },
       ]
     },
     subtotalCents() {
@@ -411,6 +447,7 @@ export default {
           number: offer.number || '',
           customerId: offer.customerId || null,
           caseId: offer.caseId || null,
+          status: offer.status || 'draft',
           issueDate: toDateInput(offer.issueDate),
           validUntil: toDateInput(offer.validUntil),
           greetingText: offer.greetingText || this.texts?.offerGreeting || '',
@@ -487,6 +524,9 @@ export default {
       }
       return `${(Number(value) / 100).toFixed(2)} %`
     },
+    toggleGeneral() {
+      this.showGeneral = !this.showGeneral
+    },
     isValidDateInput(value) {
       if (!value) {
         return false
@@ -523,6 +563,7 @@ export default {
           number: this.form.number || null,
           caseId: this.form.caseId,
           customerId: this.form.customerId,
+          status: this.form.status || 'draft',
           issueDate: fromDateInput(this.form.issueDate),
           validUntil: fromDateInput(this.form.validUntil),
           greetingText: this.form.greetingText || null,
@@ -580,6 +621,12 @@ export default {
       }
     },
     goBack() {
+      const returnTo = this.$route.query.returnTo
+      const caseId = this.$route.query.caseId || this.form.caseId
+      if (returnTo === 'case' && caseId) {
+        this.$router.push({ name: 'case-detail', params: { id: caseId } })
+        return
+      }
       this.$router.push({ name: 'offers' })
     },
   },
@@ -648,6 +695,10 @@ export default {
   gap: 12px 16px;
 }
 
+.general {
+  max-width: 980px;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -687,6 +738,41 @@ export default {
   font-size: 1.05rem;
 }
 
+.divider {
+  border: none;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  margin: 16px 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary, #1a73e8);
+  font: inherit;
+  cursor: pointer;
+}
+
+.toggle__state {
+  font-size: 0.9rem;
+  color: var(--color-text-lighter, #6b7280);
+}
+
+.general {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 
 .actions {
   display: flex;
@@ -709,6 +795,11 @@ export default {
 
 .field-error {
   color: var(--color-error, #b91c1c);
+  font-size: 12px;
+}
+
+.field-hint {
+  color: var(--color-text-lighter, #6b7280);
   font-size: 12px;
 }
 

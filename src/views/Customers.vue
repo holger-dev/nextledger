@@ -101,6 +101,30 @@
           <NcTextField label="E-Mail" :value.sync="form.email" />
           <p v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</p>
         </div>
+        <div class="form-group">
+          <NcTextField label="Rechnungs-E-Mail" :value.sync="form.billingEmail" :label-outside="true" />
+          <p v-if="fieldErrors.billingEmail" class="field-error">{{ fieldErrors.billingEmail }}</p>
+        </div>
+        <div class="form-group">
+          <p class="label">Rechnung versenden an</p>
+          <div class="recipient-switches">
+            <NcCheckboxRadioSwitch
+              type="switch"
+              :checked="form.sendInvoiceToBillingEmail"
+              @update:checked="updateRecipientFlag('sendInvoiceToBillingEmail', $event)"
+            >
+              Rechnungs-E-Mail
+            </NcCheckboxRadioSwitch>
+            <NcCheckboxRadioSwitch
+              type="switch"
+              :checked="form.sendInvoiceToContactEmail"
+              @update:checked="updateRecipientFlag('sendInvoiceToContactEmail', $event)"
+            >
+              Ansprechpartner
+            </NcCheckboxRadioSwitch>
+          </div>
+          <p class="hint">Standard: Rechnungs-E-Mail (wenn vorhanden), sonst Ansprechpartner.</p>
+        </div>
 
         <div class="actions">
           <NcButton type="primary" :disabled="saving || !canSave" @click="save">
@@ -117,7 +141,7 @@
 </template>
 
 <script>
-import { NcButton, NcEmptyContent, NcLoadingIcon, NcModal } from '@nextcloud/vue'
+import { NcButton, NcCheckboxRadioSwitch, NcEmptyContent, NcLoadingIcon, NcModal } from '@nextcloud/vue'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
@@ -132,6 +156,7 @@ export default {
   name: 'Customers',
   components: {
     NcButton,
+    NcCheckboxRadioSwitch,
     NcEmptyContent,
     NcLoadingIcon,
     NcModal,
@@ -157,6 +182,14 @@ export default {
         zip: '',
         city: '',
         email: '',
+        billingEmail: '',
+        sendInvoiceToBillingEmail: false,
+        sendInvoiceToContactEmail: false,
+      },
+      recipientsTouched: false,
+      originalRecipientFlags: {
+        sendInvoiceToBillingEmail: null,
+        sendInvoiceToContactEmail: null,
       },
       fieldErrors: {},
     }
@@ -179,6 +212,7 @@ export default {
           item.zip,
           item.city,
           item.email,
+          item.billingEmail,
         ]
           .filter(Boolean)
           .join(' ')
@@ -190,12 +224,33 @@ export default {
   async mounted() {
     await this.load()
   },
+  watch: {
+    'form.billingEmail'() {
+      if (!this.recipientsTouched) {
+        this.applyRecipientDefaults()
+      }
+    },
+    'form.email'() {
+      if (!this.recipientsTouched) {
+        this.applyRecipientDefaults()
+      }
+    },
+  },
   methods: {
     isValidEmail(value) {
       if (!value) {
         return true
       }
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+    },
+    updateRecipientFlag(field, value) {
+      this.form[field] = value
+      this.recipientsTouched = true
+    },
+    applyRecipientDefaults() {
+      const billingEmail = (this.form.billingEmail || '').trim()
+      this.form.sendInvoiceToBillingEmail = !!billingEmail
+      this.form.sendInvoiceToContactEmail = !billingEmail
     },
     async load() {
       this.loading = true
@@ -219,6 +274,14 @@ export default {
         zip: '',
         city: '',
         email: '',
+        billingEmail: '',
+        sendInvoiceToBillingEmail: false,
+        sendInvoiceToContactEmail: false,
+      }
+      this.recipientsTouched = false
+      this.originalRecipientFlags = {
+        sendInvoiceToBillingEmail: null,
+        sendInvoiceToContactEmail: null,
       }
       this.fieldErrors = {}
       this.error = ''
@@ -241,7 +304,18 @@ export default {
         zip: item.zip || '',
         city: item.city || '',
         email: item.email || '',
+        billingEmail: item.billingEmail || '',
+        sendInvoiceToBillingEmail: !!item.sendInvoiceToBillingEmail,
+        sendInvoiceToContactEmail: !!item.sendInvoiceToContactEmail,
       }
+      this.originalRecipientFlags = {
+        sendInvoiceToBillingEmail:
+          item.sendInvoiceToBillingEmail === undefined ? null : item.sendInvoiceToBillingEmail,
+        sendInvoiceToContactEmail:
+          item.sendInvoiceToContactEmail === undefined ? null : item.sendInvoiceToContactEmail,
+      }
+      this.recipientsTouched = false
+      this.applyRecipientDefaults()
       this.fieldErrors = {}
       this.error = ''
       this.showModal = true
@@ -259,6 +333,12 @@ export default {
         this.fieldErrors = { email: 'Bitte eine gültige E-Mail-Adresse angeben.' }
         return
       }
+      if (!this.isValidEmail(this.form.billingEmail.trim())) {
+        this.fieldErrors = {
+          billingEmail: 'Bitte eine gültige Rechnungs-E-Mail-Adresse angeben.',
+        }
+        return
+      }
 
       this.saving = true
       this.saved = false
@@ -272,6 +352,13 @@ export default {
         zip: this.form.zip.trim(),
         city: this.form.city.trim(),
         email: this.form.email.trim(),
+        billingEmail: this.form.billingEmail.trim(),
+        sendInvoiceToBillingEmail: this.recipientsTouched
+          ? !!this.form.sendInvoiceToBillingEmail
+          : this.originalRecipientFlags.sendInvoiceToBillingEmail,
+        sendInvoiceToContactEmail: this.recipientsTouched
+          ? !!this.form.sendInvoiceToContactEmail
+          : this.originalRecipientFlags.sendInvoiceToContactEmail,
       }
 
       try {
@@ -408,6 +495,22 @@ export default {
 
 .field-error {
   color: var(--color-error, #b91c1c);
+  font-size: 12px;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.recipient-switches {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hint {
+  color: var(--color-text-lighter, #6b7280);
   font-size: 12px;
 }
 

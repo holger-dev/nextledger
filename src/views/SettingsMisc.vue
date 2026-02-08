@@ -1,6 +1,6 @@
 <template>
   <section class="settings">
-    <h1>Weiteres</h1>
+    <h1>Kontodaten</h1>
 
     <NcLoadingIcon v-if="loading" />
 

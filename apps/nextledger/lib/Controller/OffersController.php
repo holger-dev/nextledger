@@ -6,6 +6,7 @@ namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\Offer;
 use OCA\NextLedger\Db\OfferMapper;
+use OCA\NextLedger\Service\EmailSettingsService;
 use OCA\NextLedger\Service\OfferPdfService;
 use OCA\NextLedger\Service\NumberGenerator;
 use OCP\AppFramework\ApiController;
@@ -16,6 +17,7 @@ use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\IRequest;
+use OCP\Mail\IMailer;
 
 class OffersController extends ApiController {
     public function __construct(
@@ -24,6 +26,8 @@ class OffersController extends ApiController {
         private OfferMapper $offerMapper,
         private NumberGenerator $numberGenerator,
         private OfferPdfService $offerPdfService,
+        private IMailer $mailer,
+        private EmailSettingsService $emailSettingsService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -214,6 +218,98 @@ class OffersController extends ApiController {
             $result['filename'],
             'application/pdf'
         );
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function sendEmail(string $id, ?array $to = null, ?string $subject = null, ?string $body = null): JSONResponse {
+        $offerId = (int)$id;
+        try {
+            /** @var Offer $offer */
+            $offer = $this->offerMapper->find($offerId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $params = $this->request->getParams();
+        $to = $to ?? $params['to'] ?? [];
+        $subject = $subject ?? $params['subject'] ?? '';
+        $body = $body ?? $params['body'] ?? '';
+
+        $recipients = $this->normalizeRecipients($to);
+        if (empty($recipients)) {
+            return new JSONResponse(['message' => 'Keine gültigen Empfänger gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->offerPdfService->buildPdf($offer->getId());
+        } catch (\Throwable $e) {
+            return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+
+        try {
+            $this->sendWithAttachment($recipients, (string)$subject, (string)$body, $result['filename'], $result['content']);
+        } catch (\Throwable $e) {
+            return new JSONResponse(['message' => 'E-Mail konnte nicht gesendet werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+
+        return new JSONResponse(['status' => 'sent']);
+    }
+
+    private function normalizeRecipients(mixed $value): array {
+        if (is_string($value)) {
+            $value = array_map('trim', explode(',', $value));
+        }
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $recipients = [];
+        foreach ($value as $entry) {
+            $email = trim((string)$entry);
+            if ($email === '') {
+                continue;
+            }
+            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $recipients[] = $email;
+            }
+        }
+
+        return array_values(array_unique($recipients));
+    }
+
+    private function sendWithAttachment(array $recipients, string $subject, string $body, string $filename, string $content): void {
+        $message = $this->mailer->createMessage();
+        $message->setTo($recipients);
+        $message->setSubject($subject);
+        $message->setPlainBody($body);
+
+        $emails = $this->emailSettingsService->getEffectiveEmails();
+        if (!empty($emails['fromEmail'])) {
+            $message->setFrom([$emails['fromEmail']]);
+        }
+        if (!empty($emails['replyToEmail'])) {
+            $message->setReplyTo([$emails['replyToEmail']]);
+        }
+
+        $tmpPath = $this->writeTempAttachment($filename, $content);
+        try {
+            $attachment = $this->mailer->createAttachmentFromPath($tmpPath);
+            $message->attach($attachment);
+            $this->mailer->send($message);
+        } finally {
+            @unlink($tmpPath);
+        }
+    }
+
+    private function writeTempAttachment(string $filename, string $content): string {
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename) ?: 'attachment.pdf';
+        $tmpPath = sys_get_temp_dir() . '/' . uniqid('nextledger-', true) . '-' . $safeName;
+        file_put_contents($tmpPath, $content);
+        return $tmpPath;
     }
 
     private function entityToArray(object $entity): array {

@@ -183,25 +183,51 @@
     <NcModal v-if="showSendInvoiceModal" size="normal" @close="closeSendInvoiceModal">
       <div class="modal__content">
         <h2>Rechnung verschicken</h2>
-        <p>
-          Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
-        </p>
-        <p>
-          Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
-        </p>
-        <div class="actions">
-          <NcButton
-            type="primary"
-            :disabled="!canSendInvoiceEmail"
-            @click="openInvoiceMailto"
-          >
-            Mailvorlage erstellen
-          </NcButton>
-          <NcButton type="secondary" @click="closeSendInvoiceModal">Schließen</NcButton>
-        </div>
-        <p class="hint">
-          Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
-        </p>
+        <template v-if="isDirectEmail">
+          <p>Die E-Mail wird direkt über den SMTP-Server versendet.</p>
+          <div class="email-preview">
+            <p><strong>Empfänger:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
+            <p v-if="effectiveFromEmail"><strong>Absender:</strong> {{ effectiveFromEmail }}</p>
+            <p v-if="effectiveReplyToEmail"><strong>Antwort an:</strong> {{ effectiveReplyToEmail }}</p>
+            <p><strong>Betreff:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
+            <p><strong>Anhang:</strong> {{ sendInvoicePreview?.attachmentName || '–' }}</p>
+            <pre class="email-body">{{ sendInvoicePreview?.body || '' }}</pre>
+          </div>
+          <div class="actions">
+            <NcButton
+              type="primary"
+              :disabled="!canSendInvoiceEmail || sendingInvoice"
+              @click="sendInvoiceDirect"
+            >
+              E-Mail senden
+            </NcButton>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">Abbrechen</NcButton>
+            <span v-if="sendingInvoice" class="hint">Sende…</span>
+            <span v-if="sentInvoiceEmail" class="success">Gesendet</span>
+            <span v-if="sendInvoiceError" class="error">{{ sendInvoiceError }}</span>
+          </div>
+        </template>
+        <template v-else>
+          <p>
+            Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
+          </p>
+          <p>
+            Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
+          </p>
+          <div class="actions">
+            <NcButton
+              type="primary"
+              :disabled="!canSendInvoiceEmail"
+              @click="openInvoiceMailto"
+            >
+              Mailvorlage erstellen
+            </NcButton>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">Schließen</NcButton>
+          </div>
+          <p class="hint">
+            Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
+          </p>
+        </template>
       </div>
     </NcModal>
   </section>
@@ -216,11 +242,17 @@ import DownloadBoxOutline from 'vue-material-design-icons/DownloadBoxOutline.vue
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
-import { deleteInvoice, getInvoicePdfUrl, getInvoices, updateInvoice } from '../api/invoices'
+import {
+  deleteInvoice,
+  getInvoicePdfUrl,
+  getInvoices,
+  sendInvoiceEmail,
+  updateInvoice,
+} from '../api/invoices'
 import { getInvoiceItems } from '../api/invoiceItems'
 import { getCases } from '../api/cases'
 import { getCustomers } from '../api/customers'
-import { getTexts } from '../api/settings'
+import { getEmailBehavior, getTexts } from '../api/settings'
 
 export default {
   name: 'Invoices',
@@ -246,6 +278,7 @@ export default {
       customers: [],
       cases: [],
       texts: null,
+      emailBehavior: null,
       expandedId: null,
       invoiceItems: [],
       filterCustomerId: null,
@@ -255,6 +288,10 @@ export default {
       showSendInvoiceModal: false,
       sendInvoiceTarget: null,
       sendInvoiceMailto: '',
+      sendInvoicePreview: null,
+      sendInvoiceError: '',
+      sendingInvoice: false,
+      sentInvoiceEmail: false,
     }
   },
   computed: {
@@ -298,7 +335,21 @@ export default {
       return filtered.sort((a, b) => this.sortInvoices(a, b))
     },
     canSendInvoiceEmail() {
+      if (this.isDirectEmail) {
+        return !!this.sendInvoicePreview?.to?.length
+      }
       return !!this.sendInvoiceMailto
+    },
+    isDirectEmail() {
+      return this.emailBehavior?.mode === 'direct'
+    },
+    effectiveFromEmail() {
+      const stored = (this.emailBehavior?.fromEmail || '').trim()
+      return stored || this.emailBehavior?.defaultFromEmail || ''
+    },
+    effectiveReplyToEmail() {
+      const stored = (this.emailBehavior?.replyToEmail || '').trim()
+      return stored || this.emailBehavior?.defaultReplyToEmail || ''
     },
   },
   async mounted() {
@@ -309,16 +360,18 @@ export default {
       this.loading = true
       this.error = ''
       try {
-        const [invoices, customers, cases, texts] = await Promise.all([
+        const [invoices, customers, cases, texts, emailBehavior] = await Promise.all([
           getInvoices(),
           getCustomers(),
           getCases(),
           getTexts(),
+          getEmailBehavior(),
         ])
         this.invoices = Array.isArray(invoices) ? invoices : []
         this.customers = Array.isArray(customers) ? customers : []
         this.cases = Array.isArray(cases) ? cases : []
         this.texts = texts || {}
+        this.emailBehavior = emailBehavior || { mode: 'manual' }
       } catch (e) {
         this.error = 'Rechnungen konnten nicht geladen werden.'
       } finally {
@@ -385,6 +438,10 @@ export default {
         status,
         caseId: invoice.caseId,
         customerId: invoice.customerId,
+        invoiceType: invoice.invoiceType || 'standard',
+        relatedOfferId: invoice.relatedOfferId || null,
+        servicePeriodStart: invoice.servicePeriodStart || null,
+        servicePeriodEnd: invoice.servicePeriodEnd || null,
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate,
         greetingText: invoice.greetingText || null,
@@ -403,15 +460,28 @@ export default {
     },
     openSendInvoiceModal(invoice) {
       this.sendInvoiceTarget = invoice
-      this.sendInvoiceMailto = this.buildInvoiceMailto(invoice)
-      const pdfUrl = getInvoicePdfUrl(invoice.id)
-      window.open(pdfUrl, '_blank')
+      this.sendInvoiceError = ''
+      this.sentInvoiceEmail = false
+      const emailData = this.buildInvoiceEmailData(invoice)
+      this.sendInvoicePreview = {
+        ...emailData,
+        attachmentName: this.buildInvoiceAttachmentName(invoice),
+      }
+      this.sendInvoiceMailto = this.buildInvoiceMailtoFromData(emailData)
+      if (!this.isDirectEmail) {
+        const pdfUrl = getInvoicePdfUrl(invoice.id)
+        window.open(pdfUrl, '_blank')
+      }
       this.showSendInvoiceModal = true
     },
     closeSendInvoiceModal() {
       this.showSendInvoiceModal = false
       this.sendInvoiceTarget = null
       this.sendInvoiceMailto = ''
+      this.sendInvoicePreview = null
+      this.sendInvoiceError = ''
+      this.sendingInvoice = false
+      this.sentInvoiceEmail = false
     },
     openInvoiceMailto() {
       if (!this.sendInvoiceMailto) {
@@ -419,7 +489,14 @@ export default {
       }
       window.location.href = this.sendInvoiceMailto
     },
-    buildInvoiceMailto(invoice) {
+    buildInvoiceMailtoFromData(data) {
+      const to = data.to.join(',')
+      const subject = encodeURIComponent(data.subject)
+      const body = encodeURIComponent(data.body)
+      const base = to ? `mailto:${to}` : 'mailto:'
+      return `${base}?subject=${subject}&body=${body}`
+    },
+    buildInvoiceEmailData(invoice) {
       const customer = this.customers.find((entry) => entry.id === invoice.customerId)
       const caseItem = this.cases.find((entry) => entry.id === invoice.caseId)
       const contact = (customer?.contactName || '').trim()
@@ -441,11 +518,74 @@ export default {
         this.texts?.invoiceEmailBody ||
         '{{customerSalutation}},\n\nanbei die Rechnung {{invoiceNumber}}.\n\nViele Grüße'
 
-      const to = customer?.email || ''
-      const subject = encodeURIComponent(this.applyTemplate(subjectTemplate, context))
-      const body = encodeURIComponent(this.applyTemplate(bodyTemplate, context))
-      const base = to ? `mailto:${to}` : 'mailto:'
-      return `${base}?subject=${subject}&body=${body}`
+      const recipients = this.buildInvoiceRecipients(caseItem, customer)
+      return {
+        to: recipients,
+        subject: this.applyTemplate(subjectTemplate, context),
+        body: this.applyTemplate(bodyTemplate, context),
+      }
+    },
+    buildInvoiceAttachmentName(invoice) {
+      const suffix = invoice.number || invoice.id
+      return `rechnung-${suffix}.pdf`
+    },
+    async sendInvoiceDirect() {
+      if (!this.sendInvoiceTarget || !this.sendInvoicePreview) {
+        return
+      }
+      this.sendingInvoice = true
+      this.sendInvoiceError = ''
+      this.sentInvoiceEmail = false
+      try {
+        await sendInvoiceEmail(this.sendInvoiceTarget.id, {
+          to: this.sendInvoicePreview.to,
+          subject: this.sendInvoicePreview.subject,
+          body: this.sendInvoicePreview.body,
+        })
+        this.sentInvoiceEmail = true
+        window.setTimeout(() => {
+          this.closeSendInvoiceModal()
+        }, 700)
+      } catch (e) {
+        this.sendInvoiceError = 'E-Mail konnte nicht gesendet werden.'
+      } finally {
+        this.sendingInvoice = false
+      }
+    },
+    buildInvoiceRecipients(caseItem, customer) {
+      const billingEmail = (customer?.billingEmail || '').trim()
+      const contactEmail = (customer?.email || '').trim()
+      const recipientState = this.getInvoiceRecipientFlags(customer)
+      const recipients = []
+      if (recipientState.sendInvoiceToBillingEmail && billingEmail) {
+        recipients.push(billingEmail)
+      }
+      if (recipientState.sendInvoiceToContactEmail && contactEmail) {
+        recipients.push(contactEmail)
+      }
+      return recipients
+    },
+    getInvoiceRecipientFlags(customer) {
+      if (
+        customer &&
+        ((customer.sendInvoiceToBillingEmail !== null &&
+          customer.sendInvoiceToBillingEmail !== undefined) ||
+          (customer.sendInvoiceToContactEmail !== null &&
+            customer.sendInvoiceToContactEmail !== undefined))
+      ) {
+        return {
+          sendInvoiceToBillingEmail: !!customer.sendInvoiceToBillingEmail,
+          sendInvoiceToContactEmail: !!customer.sendInvoiceToContactEmail,
+        }
+      }
+      return this.getInvoiceRecipientDefaults(customer)
+    },
+    getInvoiceRecipientDefaults(customer) {
+      const billingEmail = (customer?.billingEmail || '').trim()
+      return {
+        sendInvoiceToBillingEmail: !!billingEmail,
+        sendInvoiceToContactEmail: !billingEmail,
+      }
     },
     applyTemplate(template, context) {
       return Object.entries(context).reduce(
@@ -615,8 +755,30 @@ export default {
   flex-wrap: wrap;
 }
 
+.email-preview {
+  background: var(--color-background-dark, #f3f4f6);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.email-body {
+  white-space: pre-wrap;
+  background: var(--color-main-background, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+  max-height: 200px;
+  overflow: auto;
+}
+
 .hint {
   color: var(--color-text-lighter, #6b7280);
+}
+
+.success {
+  color: var(--color-success, #2d9a4f);
 }
 
 @media (max-width: 900px) {

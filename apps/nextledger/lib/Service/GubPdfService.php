@@ -14,6 +14,10 @@ use OCA\NextLedger\Db\Income;
 use OCA\NextLedger\Db\IncomeMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\IConfig;
+use OCP\IUserSession;
+use DateTimeImmutable;
+use DateTimeZone;
 use RuntimeException;
 
 class GubPdfService {
@@ -21,6 +25,8 @@ class GubPdfService {
         private FiscalYearMapper $fiscalYearMapper,
         private IncomeMapper $incomeMapper,
         private ExpenseMapper $expenseMapper,
+        private IConfig $config,
+        private IUserSession $userSession,
     ) {}
 
     /**
@@ -157,9 +163,26 @@ class GubPdfService {
         if (!$value) {
             return '–';
         }
-        // Add 12h to avoid timezone shifts for date-only values stored at midnight.
-        $safe = $value + (12 * 3600);
-        return date('d.m.Y', $safe);
+        $timezone = $this->getUserTimezone();
+        try {
+            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone($timezone));
+        } catch (\Throwable $e) {
+            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone('UTC'));
+        }
+
+        return $date->format('d.m.Y');
+    }
+
+    private function getUserTimezone(): string {
+        $user = $this->userSession->getUser();
+        if ($user && method_exists($user, 'getUID')) {
+            $timezone = (string)$this->config->getUserValue($user->getUID(), 'core', 'timezone', 'UTC');
+            if ($timezone !== '') {
+                return $timezone;
+            }
+        }
+
+        return 'UTC';
     }
 
     private function escape(?string $value): string {

@@ -47,6 +47,9 @@ class CustomersController extends ApiController {
         ?string $zip = null,
         ?string $city = null,
         ?string $email = null,
+        ?string $billingEmail = null,
+        ?bool $sendInvoiceToBillingEmail = null,
+        ?bool $sendInvoiceToContactEmail = null,
     ): JSONResponse {
         $customer = new Customer();
         $customer->setCompany($company);
@@ -56,6 +59,9 @@ class CustomersController extends ApiController {
         $customer->setZip($zip);
         $customer->setCity($city);
         $customer->setEmail($email);
+        $customer->setBillingEmail($billingEmail);
+        $customer->setSendInvoiceToBillingEmail($sendInvoiceToBillingEmail);
+        $customer->setSendInvoiceToContactEmail($sendInvoiceToContactEmail);
         $customer->setCreatedAt(time());
         $customer->setUpdatedAt(time());
 
@@ -76,6 +82,9 @@ class CustomersController extends ApiController {
         ?string $zip = null,
         ?string $city = null,
         ?string $email = null,
+        ?string $billingEmail = null,
+        ?bool $sendInvoiceToBillingEmail = null,
+        ?bool $sendInvoiceToContactEmail = null,
     ): JSONResponse {
         $customerId = (int)$id;
         try {
@@ -92,6 +101,9 @@ class CustomersController extends ApiController {
         $customer->setZip($zip);
         $customer->setCity($city);
         $customer->setEmail($email);
+        $customer->setBillingEmail($billingEmail);
+        $customer->setSendInvoiceToBillingEmail($sendInvoiceToBillingEmail);
+        $customer->setSendInvoiceToContactEmail($sendInvoiceToContactEmail);
         $customer->setUpdatedAt(time());
 
         $saved = $this->customerMapper->update($customer);

@@ -48,4 +48,22 @@ class InvoiceMapper extends BaseMapper {
 
         return $this->findEntities($qb);
     }
+
+    /**
+     * @return Invoice[]
+     */
+    public function findByRelatedOfferId(int $offerId): array {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->tableName)
+            ->where(
+                $qb->expr()->eq(
+                    'related_offer_id',
+                    $qb->createNamedParameter($offerId, IQueryBuilder::PARAM_INT)
+                )
+            )
+            ->orderBy('issue_date', 'ASC');
+
+        return $this->findEntities($qb);
+    }
 }

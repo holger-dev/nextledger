@@ -9,6 +9,7 @@ use OCA\NextLedger\Db\IncomeMapper;
 use OCA\NextLedger\Db\Invoice;
 use OCA\NextLedger\Db\InvoiceMapper;
 use OCA\NextLedger\Db\FiscalYearMapper;
+use OCA\NextLedger\Service\EmailSettingsService;
 use OCA\NextLedger\Service\InvoicePdfService;
 use OCA\NextLedger\Service\NumberGenerator;
 use OCP\AppFramework\ApiController;
@@ -19,6 +20,7 @@ use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\IRequest;
+use OCP\Mail\IMailer;
 
 class InvoicesController extends ApiController {
     public function __construct(
@@ -29,6 +31,8 @@ class InvoicesController extends ApiController {
         private FiscalYearMapper $fiscalYearMapper,
         private NumberGenerator $numberGenerator,
         private InvoicePdfService $invoicePdfService,
+        private IMailer $mailer,
+        private EmailSettingsService $emailSettingsService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -87,6 +91,10 @@ class InvoicesController extends ApiController {
         ?int $customerId = null,
         ?string $number = null,
         ?string $status = null,
+        ?string $invoiceType = null,
+        ?int $relatedOfferId = null,
+        ?int $servicePeriodStart = null,
+        ?int $servicePeriodEnd = null,
         ?int $issueDate = null,
         ?int $dueDate = null,
         ?string $greetingText = null,
@@ -114,6 +122,10 @@ class InvoicesController extends ApiController {
         $invoice->setCustomerId($customerId);
         $invoice->setNumber($number ?: $this->numberGenerator->nextInvoiceNumber());
         $invoice->setStatus($status ?: 'open');
+        $invoice->setInvoiceType($invoiceType ?: 'standard');
+        $invoice->setRelatedOfferId($relatedOfferId);
+        $invoice->setServicePeriodStart($servicePeriodStart);
+        $invoice->setServicePeriodEnd($servicePeriodEnd);
         $invoice->setIssueDate($issueDate ?? time());
         $invoice->setDueDate($dueDate);
         $invoice->setGreetingText($greetingText);
@@ -143,6 +155,10 @@ class InvoicesController extends ApiController {
         ?int $customerId = null,
         ?string $number = null,
         ?string $status = null,
+        ?string $invoiceType = null,
+        ?int $relatedOfferId = null,
+        ?int $servicePeriodStart = null,
+        ?int $servicePeriodEnd = null,
         ?int $issueDate = null,
         ?int $dueDate = null,
         ?string $greetingText = null,
@@ -172,6 +188,14 @@ class InvoicesController extends ApiController {
             $invoice->setNumber($number);
         }
         $invoice->setStatus($status);
+        $resolvedType = $invoiceType;
+        if ($resolvedType === null || $resolvedType === '') {
+            $resolvedType = $invoice->getInvoiceType() ?? 'standard';
+        }
+        $invoice->setInvoiceType($resolvedType);
+        $invoice->setRelatedOfferId($relatedOfferId ?? $invoice->getRelatedOfferId());
+        $invoice->setServicePeriodStart($servicePeriodStart ?? $invoice->getServicePeriodStart());
+        $invoice->setServicePeriodEnd($servicePeriodEnd ?? $invoice->getServicePeriodEnd());
         $invoice->setIssueDate($issueDate);
         $invoice->setDueDate($dueDate);
         $invoice->setGreetingText($greetingText);
@@ -233,6 +257,44 @@ class InvoicesController extends ApiController {
         );
     }
 
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function sendEmail(string $id, ?array $to = null, ?string $subject = null, ?string $body = null): JSONResponse {
+        $invoiceId = (int)$id;
+        try {
+            /** @var Invoice $invoice */
+            $invoice = $this->invoiceMapper->find($invoiceId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $params = $this->request->getParams();
+        $to = $to ?? $params['to'] ?? [];
+        $subject = $subject ?? $params['subject'] ?? '';
+        $body = $body ?? $params['body'] ?? '';
+
+        $recipients = $this->normalizeRecipients($to);
+        if (empty($recipients)) {
+            return new JSONResponse(['message' => 'Keine gültigen Empfänger gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->invoicePdfService->buildPdf($invoice->getId());
+        } catch (\Throwable $e) {
+            return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+
+        try {
+            $this->sendWithAttachment($recipients, (string)$subject, (string)$body, $result['filename'], $result['content']);
+        } catch (\Throwable $e) {
+            return new JSONResponse(['message' => 'E-Mail konnte nicht gesendet werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+
+        return new JSONResponse(['status' => 'sent']);
+    }
+
     private function syncIncome(Invoice $invoice): void {
         $income = $this->incomeMapper->findByInvoiceId($invoice->getId());
         $year = null;
@@ -267,6 +329,60 @@ class InvoicesController extends ApiController {
         $income->setCreatedAt(time());
         $income->setUpdatedAt(time());
         $this->incomeMapper->insert($income);
+    }
+
+    private function normalizeRecipients(mixed $value): array {
+        if (is_string($value)) {
+            $value = array_map('trim', explode(',', $value));
+        }
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $recipients = [];
+        foreach ($value as $entry) {
+            $email = trim((string)$entry);
+            if ($email === '') {
+                continue;
+            }
+            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $recipients[] = $email;
+            }
+        }
+
+        return array_values(array_unique($recipients));
+    }
+
+    private function sendWithAttachment(array $recipients, string $subject, string $body, string $filename, string $content): void {
+        $message = $this->mailer->createMessage();
+        $message->setTo($recipients);
+        $message->setSubject($subject);
+        $message->setPlainBody($body);
+
+        $emails = $this->emailSettingsService->getEffectiveEmails();
+        if (!empty($emails['fromEmail'])) {
+            $message->setFrom([$emails['fromEmail']]);
+        }
+        if (!empty($emails['replyToEmail'])) {
+            $message->setReplyTo([$emails['replyToEmail']]);
+        }
+
+        $tmpPath = $this->writeTempAttachment($filename, $content);
+        try {
+            $attachment = $this->mailer->createAttachmentFromPath($tmpPath);
+            $message->attach($attachment);
+            $this->mailer->send($message);
+        } finally {
+            @unlink($tmpPath);
+        }
+    }
+
+    private function writeTempAttachment(string $filename, string $content): string {
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename) ?: 'attachment.pdf';
+        $tmpPath = sys_get_temp_dir() . '/' . uniqid('nextledger-', true) . '-' . $safeName;
+        file_put_contents($tmpPath, $content);
+        return $tmpPath;
     }
 
     private function entityToArray(object $entity): array {

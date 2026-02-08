@@ -17,3 +17,6 @@ export const saveTax = (payload) => put('tax', payload)
 
 export const getMisc = () => get('misc')
 export const saveMisc = (payload) => put('misc', payload)
+
+export const getEmailBehavior = () => get('email-behavior')
+export const saveEmailBehavior = (payload) => put('email-behavior', payload)

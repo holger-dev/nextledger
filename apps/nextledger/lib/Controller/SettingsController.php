@@ -12,6 +12,7 @@ use OCA\NextLedger\Db\TaxSetting;
 use OCA\NextLedger\Db\TaxSettingMapper;
 use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
+use OCA\NextLedger\Service\EmailSettingsService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
@@ -24,6 +25,7 @@ class SettingsController extends ApiController {
         private TextsMapper $textsMapper,
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
+        private EmailSettingsService $emailSettingsService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -184,6 +186,37 @@ class SettingsController extends ApiController {
         $saved = $this->persistSingleton($this->miscSettingMapper, $misc);
 
         return new JSONResponse($saved);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function getEmailBehavior(): JSONResponse {
+        return new JSONResponse($this->emailSettingsService->getSettings());
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function saveEmailBehavior(
+        ?string $mode = null,
+        ?string $fromEmail = null,
+        ?string $replyToEmail = null,
+    ): JSONResponse {
+        $params = $this->request->getParams();
+        if ($mode === null) {
+            $mode = $params['mode'] ?? null;
+        }
+        if ($fromEmail === null) {
+            $fromEmail = $params['fromEmail'] ?? null;
+        }
+        if ($replyToEmail === null) {
+            $replyToEmail = $params['replyToEmail'] ?? null;
+        }
+
+        return new JSONResponse($this->emailSettingsService->saveSettings($mode, $fromEmail, $replyToEmail));
     }
 
     private function getSingleton(object $mapper, string $entityClass): array {

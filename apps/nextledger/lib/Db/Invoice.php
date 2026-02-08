@@ -12,6 +12,10 @@ class Invoice extends Entity {
     public $customerId;
     public $number;
     public $status;
+    public $invoiceType;
+    public $relatedOfferId;
+    public $servicePeriodStart;
+    public $servicePeriodEnd;
     public $issueDate;
     public $dueDate;
     public $greetingText;
@@ -30,6 +34,10 @@ class Invoice extends Entity {
         $this->addType('customerId', 'integer');
         $this->addType('number', 'string');
         $this->addType('status', 'string');
+        $this->addType('invoiceType', 'string');
+        $this->addType('relatedOfferId', 'integer');
+        $this->addType('servicePeriodStart', 'integer');
+        $this->addType('servicePeriodEnd', 'integer');
         $this->addType('issueDate', 'integer');
         $this->addType('dueDate', 'integer');
         $this->addType('greetingText', 'text');

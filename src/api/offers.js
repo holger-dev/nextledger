@@ -28,3 +28,6 @@ export const deleteOffer = (id) =>
 
 export const getOfferPdfUrl = (id) =>
   generateUrl(`${base}/${id}/pdf`)
+
+export const sendOfferEmail = (id, payload) =>
+  axios.post(generateUrl(`${base}/${id}/send-email`), payload).then((r) => r.data)

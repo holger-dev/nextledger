@@ -56,6 +56,19 @@
             <p v-if="fieldErrors.caseId" class="field-error">{{ fieldErrors.caseId }}</p>
           </div>
           <div class="form-group">
+            <NcSelect
+              id="offerStatus"
+              v-model="form.status"
+              :options="statusOptions"
+              :reduce="(option) => option.value"
+              :append-to-body="false"
+              :clearable="false"
+              input-label="Status"
+              :label-outside="true"
+              placeholder="Status"
+            />
+          </div>
+          <div class="form-group">
             <NcTextField
               label="Ausstellungsdatum *"
               type="text"
@@ -240,15 +253,21 @@ const fromDateInput = (value) => {
     return null
   }
   const date = new Date(`${value}T00:00:00`)
-  return Math.floor(date.getTime() / 1000)
+  const utcSeconds = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 1000
+  return Math.floor(utcSeconds)
 }
 
-const todayInput = () => new Date().toISOString().slice(0, 10)
+const toDateInput = (date) => {
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+const todayInput = () => toDateInput(new Date())
 
 const addDaysInput = (dateInput, days) => {
   const date = new Date(`${dateInput}T00:00:00`)
   date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
+  return toDateInput(date)
 }
 
 const createEmptyItem = () => ({
@@ -286,6 +305,7 @@ export default {
       form: {
         customerId: null,
         caseId: null,
+        status: 'draft',
         issueDate: '',
         validUntil: '',
         greetingText: '',
@@ -330,6 +350,13 @@ export default {
       return [
         { label: 'Produkt/DL', value: 'product' },
         { label: 'Freie Position', value: 'custom' },
+      ]
+    },
+    statusOptions() {
+      return [
+        { label: 'Entwurf', value: 'draft' },
+        { label: 'Versendet', value: 'sent' },
+        { label: 'Angenommen', value: 'accepted' },
       ]
     },
     subtotalCents() {
@@ -435,6 +462,7 @@ export default {
       this.form = {
         customerId: null,
         caseId: null,
+        status: 'draft',
         issueDate,
         validUntil: addDaysInput(issueDate, 14),
         greetingText: this.texts?.offerGreeting || '',
@@ -562,6 +590,7 @@ export default {
         const payload = {
           caseId: this.form.caseId,
           customerId: this.form.customerId,
+          status: this.form.status || 'draft',
           issueDate: fromDateInput(this.form.issueDate),
           validUntil: fromDateInput(this.form.validUntil),
           greetingText: this.form.greetingText || null,
@@ -572,7 +601,6 @@ export default {
           totalCents,
           taxRateBp: currentTaxRateBp,
           isSmallBusiness: currentIsSmallBusiness,
-          status: 'draft',
         }
         const offer = await createOffer(payload)
 
@@ -604,14 +632,18 @@ export default {
 
         await Promise.all(items.map((item) => createOfferItem(offer.id, item)))
         this.saved = true
-        this.$router.push({
-          name: 'cases',
-          query: {
-            caseId: this.form.caseId,
-            customerId: this.form.customerId,
-            expand: '1',
-          },
-        })
+        if (this.$route.query.returnTo === 'case' && this.form.caseId) {
+          this.$router.push({ name: 'case-detail', params: { id: this.form.caseId } })
+        } else {
+          this.$router.push({
+            name: 'cases',
+            query: {
+              caseId: this.form.caseId,
+              customerId: this.form.customerId,
+              expand: '1',
+            },
+          })
+        }
       } catch (e) {
         this.error = 'Angebot konnte nicht gespeichert werden.'
       } finally {
@@ -619,6 +651,10 @@ export default {
       }
     },
     goBack() {
+      if (this.$route.query.returnTo === 'case' && this.form.caseId) {
+        this.$router.push({ name: 'case-detail', params: { id: this.form.caseId } })
+        return
+      }
       this.$router.push({ name: 'offers' })
     },
   },

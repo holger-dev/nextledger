@@ -14,6 +14,8 @@ use OCA\NextLedger\Db\Invoice;
 use OCA\NextLedger\Db\InvoiceItem;
 use OCA\NextLedger\Db\InvoiceItemMapper;
 use OCA\NextLedger\Db\InvoiceMapper;
+use OCA\NextLedger\Db\Offer;
+use OCA\NextLedger\Db\OfferMapper;
 use OCA\NextLedger\Db\MiscSetting;
 use OCA\NextLedger\Db\MiscSettingMapper;
 use OCA\NextLedger\Db\TaxSetting;
@@ -22,6 +24,10 @@ use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\IConfig;
+use OCP\IUserSession;
+use DateTimeImmutable;
+use DateTimeZone;
 use RuntimeException;
 
 class InvoicePdfService {
@@ -30,9 +36,12 @@ class InvoicePdfService {
         private InvoiceItemMapper $invoiceItemMapper,
         private CustomerMapper $customerMapper,
         private CompanyMapper $companyMapper,
+        private OfferMapper $offerMapper,
         private TextsMapper $textsMapper,
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
+        private IConfig $config,
+        private IUserSession $userSession,
     ) {}
 
     /**
@@ -47,8 +56,9 @@ class InvoicePdfService {
         $texts = $this->loadTexts();
         $tax = $this->loadTax();
         $misc = $this->loadMisc();
+        $offer = $this->loadOffer($invoice->getRelatedOfferId());
 
-        $html = $this->renderHtml($invoice, $items, $customer, $company, $texts, $tax, $misc);
+        $html = $this->renderHtml($invoice, $items, $customer, $company, $texts, $tax, $misc, $offer);
         $content = $this->renderPdf($html);
         $filename = sprintf('rechnung-%s.pdf', $invoice->getNumber() ?: $invoiceId);
 
@@ -86,9 +96,10 @@ class InvoicePdfService {
         ?Texts $texts,
         ?TaxSetting $tax,
         ?MiscSetting $misc,
+        ?Offer $offer,
     ): string {
-        $issueDate = $invoice->getIssueDate() ? date('d.m.Y', $invoice->getIssueDate()) : '–';
-        $dueDate = $invoice->getDueDate() ? date('d.m.Y', $invoice->getDueDate()) : '–';
+        $issueDate = $this->formatDate($invoice->getIssueDate());
+        $dueDate = $this->formatDate($invoice->getDueDate());
 
         $companyBlock = $company
             ? sprintf(
@@ -161,6 +172,41 @@ class InvoicePdfService {
         }
         $bankInfo = $bankParts ? sprintf('<p>%s</p>', implode(' | ', $bankParts)) : '';
 
+        $invoiceType = $this->normalizeInvoiceType($invoice->getInvoiceType());
+        $title = match ($invoiceType) {
+            'advance' => 'Abschlagsrechnung',
+            'final' => 'Schlussrechnung',
+            default => 'Rechnung',
+        };
+
+        $offerReference = '';
+        if ($offer) {
+            $offerDate = $this->formatDate($offer->getIssueDate());
+            $offerNumber = $offer->getNumber() ?: (string)$offer->getId();
+            $offerReference = sprintf(
+                '<p><strong>Angebot:</strong> %s vom %s</p>',
+                $this->escape($offerNumber),
+                $this->escape($offerDate)
+            );
+        }
+
+        $servicePeriod = '';
+        if ($invoiceType === 'advance') {
+            $periodStart = $invoice->getServicePeriodStart()
+                ? $this->formatDate($invoice->getServicePeriodStart())
+                : null;
+            $periodEnd = $invoice->getServicePeriodEnd()
+                ? $this->formatDate($invoice->getServicePeriodEnd())
+                : null;
+            if ($periodStart || $periodEnd) {
+                $servicePeriod = sprintf(
+                    '<p><strong>Leistungszeitraum:</strong> %s%s</p>',
+                    $periodStart ? $this->escape($periodStart) : '–',
+                    $periodEnd ? ' – ' . $this->escape($periodEnd) : ''
+                );
+            }
+        }
+
         return sprintf(
             '<html><head><meta charset="UTF-8"><style>
                 @page { margin: 32px 32px 110px 32px; }
@@ -176,9 +222,11 @@ class InvoicePdfService {
             </style></head><body>
             <div class="company">%s</div>
             <div class="customer">%s</div>
-            <h1>Rechnung %s</h1>
+            <h1>%s %s</h1>
             <p><strong>Rechnungsnummer:</strong> %s</p>
             <p><strong>Datum:</strong> %s<br><strong>Fällig bis:</strong> %s</p>
+            %s
+            %s
             <p>%s</p>
             <p>%s</p>
             <table>
@@ -208,10 +256,13 @@ class InvoicePdfService {
             </body></html>',
             $companyBlock,
             $customerBlock,
+            $this->escape($title),
             $this->escape($invoice->getNumber() ?? ''),
             $this->escape($invoice->getNumber() ?? ''),
             $issueDate,
             $dueDate,
+            $offerReference,
+            $servicePeriod,
             nl2br($this->escape($greeting)),
             nl2br($this->escape($extraText)),
             $rows,
@@ -225,6 +276,14 @@ class InvoicePdfService {
             $bankInfo,
             ''
         );
+    }
+
+    private function normalizeInvoiceType(?string $invoiceType): string {
+        return match (strtolower((string)$invoiceType)) {
+            'advance', 'abschlag' => 'advance',
+            'final', 'schluss' => 'final',
+            default => 'standard',
+        };
     }
 
     private function escape(?string $value): string {
@@ -256,6 +315,19 @@ class InvoicePdfService {
         return $items[0] ?? null;
     }
 
+    private function loadOffer(?int $offerId): ?Offer {
+        if (!$offerId) {
+            return null;
+        }
+        try {
+            /** @var Offer $offer */
+            $offer = $this->offerMapper->find($offerId);
+            return $offer;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return null;
+        }
+    }
+
     private function loadTexts(): ?Texts {
         $items = $this->textsMapper->findAll(1, 0);
         return $items[0] ?? null;
@@ -269,5 +341,32 @@ class InvoicePdfService {
     private function loadMisc(): ?MiscSetting {
         $items = $this->miscSettingMapper->findAll(1, 0);
         return $items[0] ?? null;
+    }
+
+    private function formatDate(?int $value): string {
+        if (!$value) {
+            return '–';
+        }
+
+        $timezone = $this->getUserTimezone();
+        try {
+            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone($timezone));
+        } catch (\Throwable $e) {
+            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone('UTC'));
+        }
+
+        return $date->format('d.m.Y');
+    }
+
+    private function getUserTimezone(): string {
+        $user = $this->userSession->getUser();
+        if ($user && method_exists($user, 'getUID')) {
+            $timezone = (string)$this->config->getUserValue($user->getUID(), 'core', 'timezone', 'UTC');
+            if ($timezone !== '') {
+                return $timezone;
+            }
+        }
+
+        return 'UTC';
     }
 }

@@ -12,10 +12,12 @@ import OfferCreate from './views/OfferCreate.vue'
 import OfferEdit from './views/OfferEdit.vue'
 import Products from './views/Products.vue'
 import FiscalYear from './views/FiscalYear.vue'
+import CaseDetail from './views/CaseDetail.vue'
 import SettingsCompany from './views/SettingsCompany.vue'
 import SettingsTexts from './views/SettingsTexts.vue'
 import SettingsTax from './views/SettingsTax.vue'
 import SettingsMisc from './views/SettingsMisc.vue'
+import SettingsEmailBehavior from './views/SettingsEmailBehavior.vue'
 import SettingsHelp from './views/SettingsHelp.vue'
 
 Vue.use(Router)
@@ -26,6 +28,7 @@ export default new Router({
   routes: [
     { path: '/', redirect: { name: 'cases' } },
     { path: '/cases', name: 'cases', component: Cases },
+    { path: '/cases/:id', name: 'case-detail', component: CaseDetail },
     { path: '/customers', name: 'customers', component: Customers },
     { path: '/invoices', name: 'invoices', component: Invoices },
     { path: '/invoices/new', name: 'invoices-new', component: InvoiceCreate },
@@ -39,6 +42,7 @@ export default new Router({
     { path: '/settings/texts', name: 'settings-texts', component: SettingsTexts },
     { path: '/settings/tax', name: 'settings-tax', component: SettingsTax },
     { path: '/settings/misc', name: 'settings-misc', component: SettingsMisc },
+    { path: '/settings/email', name: 'settings-email', component: SettingsEmailBehavior },
     { path: '/settings/help', name: 'settings-help', component: SettingsHelp },
     { path: '*', redirect: '/' },
   ],
