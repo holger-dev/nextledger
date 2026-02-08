@@ -74,7 +74,7 @@ jobs:
       - name: Create signed release archive (make appstore)
         run: |
           cd ../server/apps/${{ env.APP_NAME }}
-          make appstore
+          make appstore APP_NAME=${{ env.APP_NAME }}
 
       - name: Upload app tarball to GitHub release
         uses: svenstaro/upload-release-action@v2
