@@ -314,7 +314,10 @@ export default {
       if (value === null || value === undefined) {
         return '–'
       }
-      return `${(Number(value) / 100).toFixed(2)} €`
+      return `${(Number(value) / 100).toLocaleString('de-DE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })} €`
     },
     formatDate(value) {
       if (!value) {

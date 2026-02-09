@@ -7,6 +7,9 @@ namespace OCA\NextLedger\Controller;
 use OCA\NextLedger\Db\Income;
 use OCA\NextLedger\Db\IncomeMapper;
 use OCP\AppFramework\ApiController;
+use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
@@ -29,6 +32,89 @@ class IncomesController extends ApiController {
         $data = array_map(fn(Income $income) => $this->entityToArray($income), $items);
 
         return new JSONResponse($data);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function create(
+        string $fiscalYearId,
+        ?string $name = null,
+        ?string $description = null,
+        ?int $amountCents = null,
+        ?int $bookedAt = null,
+        ?string $status = null,
+    ): JSONResponse {
+        $income = new Income();
+        $income->setFiscalYearId((int)$fiscalYearId);
+        $income->setInvoiceId(null);
+        $income->setName($name);
+        $income->setDescription($description);
+        $income->setAmountCents($amountCents);
+        $income->setBookedAt($bookedAt);
+        $income->setStatus($status);
+        $income->setCreatedAt(time());
+        $income->setUpdatedAt(time());
+
+        $saved = $this->incomeMapper->insert($income);
+        return new JSONResponse($this->entityToArray($saved));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function update(
+        string $id,
+        ?string $name = null,
+        ?string $description = null,
+        ?int $amountCents = null,
+        ?int $bookedAt = null,
+        ?string $status = null,
+    ): JSONResponse {
+        $incomeId = (int)$id;
+        try {
+            /** @var Income $income */
+            $income = $this->incomeMapper->find($incomeId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Einnahme nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        if ($income->getInvoiceId() !== null) {
+            return new JSONResponse(['message' => 'Einnahme stammt aus einer Rechnung.'], Http::STATUS_BAD_REQUEST);
+        }
+
+        $income->setName($name);
+        $income->setDescription($description);
+        $income->setAmountCents($amountCents);
+        $income->setBookedAt($bookedAt);
+        $income->setStatus($status);
+        $income->setUpdatedAt(time());
+
+        $saved = $this->incomeMapper->update($income);
+        return new JSONResponse($this->entityToArray($saved));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function destroy(string $id): JSONResponse {
+        $incomeId = (int)$id;
+        try {
+            /** @var Income $income */
+            $income = $this->incomeMapper->find($incomeId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Einnahme nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        if ($income->getInvoiceId() !== null) {
+            return new JSONResponse(['message' => 'Einnahme stammt aus einer Rechnung.'], Http::STATUS_BAD_REQUEST);
+        }
+
+        $this->incomeMapper->delete($income);
+        return new JSONResponse(['status' => 'ok']);
     }
 
     private function entityToArray(object $entity): array {

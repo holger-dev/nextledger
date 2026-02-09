@@ -1,11 +1,16 @@
 <template>
   <section class="fiscal-year">
-    <h1>Wirtschaftsjahr</h1>
+    <div class="page-header">
+      <h1>Wirtschaftsjahr</h1>
+      <NcButton v-if="standalone" type="secondary" @click="goToOverview">
+        Übersicht
+      </NcButton>
+    </div>
 
     <NcLoadingIcon v-if="loading" />
 
     <div v-else class="layout">
-      <div class="list">
+      <div v-if="!standalone" class="list">
         <div class="list-header">
           <h2>Übersicht</h2>
           <NcButton type="primary" @click="openCreateModal">
@@ -42,7 +47,7 @@
                 <button
                   class="link"
                   type="button"
-                  @click="toggleYear(item)"
+                  @click="openYearDetail(item)"
                 >
                   {{ item.name }}
                 </button>
@@ -55,15 +60,15 @@
               <td class="actions">
                 <NcButton
                   type="tertiary"
-                  @click="toggleYear(item)"
+                  @click="openYearDetail(item)"
                 >
-                  {{ expandedYearId === item.id ? 'Schließen' : 'Öffnen' }}
+                  Öffnen
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
                   aria-label="Details anzeigen"
                   title="Details"
-                  @click="selectYear(item)"
+                  @click="openYearDetail(item)"
                 >
                   <template #icon>
                     <FileDocumentOutline :size="18" />
@@ -95,7 +100,7 @@
         </table>
       </div>
 
-      <div v-if="selectedYear && expandedYearId === selectedYear.id" class="detail">
+      <div v-if="standalone && selectedYear" class="detail">
         <div class="detail-header">
           <div>
             <h2>{{ selectedYear.name }}</h2>
@@ -120,6 +125,9 @@
           <div class="panel">
             <div class="panel-header">
               <h3>Einnahmen</h3>
+              <NcButton type="secondary" @click="resetIncomeForm">
+                Neue Einnahme
+              </NcButton>
             </div>
             <NcEmptyContent
               v-if="incomes.length === 0"
@@ -138,7 +146,7 @@
               </thead>
               <tbody>
                 <tr v-for="income in incomes" :key="income.id">
-                  <td class="name">{{ income.description || 'Einnahme' }}</td>
+                  <td class="name">{{ income.name || income.description || 'Einnahme' }}</td>
                   <td>{{ formatDate(income.bookedAt) }}</td>
                   <td class="price">{{ formatMoney(income.amountCents) }}</td>
                   <td>{{ incomeStatusLabel(income.status) }}</td>
@@ -153,6 +161,28 @@
                     >
                       <template #icon>
                         <CheckCircleOutline :size="18" />
+                      </template>
+                    </NcButton>
+                    <NcButton
+                      v-if="!income.invoiceId"
+                      type="tertiary-no-background"
+                      aria-label="Einnahme bearbeiten"
+                      title="Bearbeiten"
+                      @click="editIncome(income)"
+                    >
+                      <template #icon>
+                        <Pencil :size="18" />
+                      </template>
+                    </NcButton>
+                    <NcButton
+                      v-if="!income.invoiceId"
+                      type="tertiary-no-background"
+                      aria-label="Einnahme löschen"
+                      title="Löschen"
+                      @click="removeIncome(income)"
+                    >
+                      <template #icon>
+                        <TrashCanOutline :size="18" />
                       </template>
                     </NcButton>
                   </td>
@@ -278,7 +308,7 @@
           Wirtschaftsjahr: {{ selectedYear.name }}
         </p>
 
-        <div class="form-grid">
+        <div class="form-stack">
           <div class="form-group">
             <NcTextField label="Name *" :value.sync="expenseForm.name" />
             <p v-if="expenseFieldErrors.name" class="field-error">{{ expenseFieldErrors.name }}</p>
@@ -302,9 +332,9 @@
             />
             <p v-if="expenseFieldErrors.amount" class="field-error">{{ expenseFieldErrors.amount }}</p>
           </div>
-        </div>
-        <div class="form-group">
-          <NcTextArea label="Beschreibung" :value.sync="expenseForm.description" />
+          <div class="form-group">
+            <NcTextArea label="Beschreibung" :value.sync="expenseForm.description" />
+          </div>
         </div>
         <div class="actions">
           <NcButton type="primary" :disabled="savingExpense || !canSaveExpense" @click="saveExpense">
@@ -314,6 +344,59 @@
           <span v-if="savingExpense" class="hint">Speichere…</span>
           <span v-if="savedExpense" class="success">Gespeichert</span>
           <span v-if="expenseError" class="error">{{ expenseError }}</span>
+        </div>
+      </div>
+    </NcModal>
+
+    <NcModal v-if="showIncomeModal" size="normal" @close="closeIncomeModal">
+      <div class="modal__content">
+        <h2>{{ editingIncomeId ? 'Einnahme bearbeiten' : 'Neue Einnahme' }}</h2>
+        <p class="subline" v-if="selectedYear">
+          Wirtschaftsjahr: {{ selectedYear.name }}
+        </p>
+
+        <div class="form-stack">
+          <div class="form-group">
+            <NcTextField label="Name *" :value.sync="incomeForm.name" />
+            <p v-if="incomeFieldErrors.name" class="field-error">
+              {{ incomeFieldErrors.name }}
+            </p>
+          </div>
+          <div class="form-group">
+            <NcDateTimePickerNative
+              label="Datum *"
+              type="date"
+              id="fiscal-year-income-date"
+              :value="incomeForm.bookedAt"
+              @input="incomeForm.bookedAt = $event"
+            />
+            <p v-if="incomeFieldErrors.bookedAt" class="field-error">
+              {{ incomeFieldErrors.bookedAt }}
+            </p>
+          </div>
+          <div class="form-group">
+            <NcTextField
+              label="Betrag *"
+              type="text"
+              placeholder="0.00"
+              :value.sync="incomeForm.amount"
+            />
+            <p v-if="incomeFieldErrors.amount" class="field-error">
+              {{ incomeFieldErrors.amount }}
+            </p>
+          </div>
+          <div class="form-group">
+            <NcTextArea label="Beschreibung" :value.sync="incomeForm.description" />
+          </div>
+        </div>
+        <div class="actions">
+          <NcButton type="primary" :disabled="savingIncome || !canSaveIncome" @click="saveIncome">
+            {{ editingIncomeId ? 'Aktualisieren' : 'Anlegen' }}
+          </NcButton>
+          <NcButton type="secondary" @click="closeIncomeModal">Abbrechen</NcButton>
+          <span v-if="savingIncome" class="hint">Speichere…</span>
+          <span v-if="savedIncome" class="success">Gespeichert</span>
+          <span v-if="incomeError" class="error">{{ incomeError }}</span>
         </div>
       </div>
     </NcModal>
@@ -342,7 +425,7 @@ import {
   getGubPdfUrl,
   updateFiscalYear,
 } from '../api/fiscalYears'
-import { getIncomes } from '../api/incomes'
+import { createIncome, deleteIncome, getIncomes, updateIncome } from '../api/incomes'
 import { createExpense, deleteExpense, getExpenses, updateExpense } from '../api/expenses'
 import { getInvoice, updateInvoice } from '../api/invoices'
 
@@ -368,6 +451,34 @@ const toTimestamp = (value) => {
   return null
 }
 
+const parseMoneyInput = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const raw = String(value).trim().replace(/\s/g, '')
+  if (!raw) {
+    return null
+  }
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw
+  const parsed = Number(normalized)
+  if (Number.isNaN(parsed)) {
+    return null
+  }
+  return parsed
+}
+
+const inputFromCents = (value) => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return (Number(value) / 100).toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
 const toDateFromTimestamp = (value) => {
   if (!value) {
     return null
@@ -386,6 +497,16 @@ const todayDate = () => {
 
 export default {
   name: 'FiscalYear',
+  props: {
+    standalone: {
+      type: Boolean,
+      default: false,
+    },
+    focusYearId: {
+      type: [String, Number],
+      default: null,
+    },
+  },
   components: {
     NcButton,
     NcCheckboxRadioSwitch,
@@ -409,9 +530,12 @@ export default {
       items: [],
       query: '',
       selectedYearId: null,
-      expandedYearId: null,
       incomes: [],
       incomeError: '',
+      savingIncome: false,
+      savedIncome: false,
+      editingIncomeId: null,
+      showIncomeModal: false,
       expenses: [],
       expenseError: '',
       savingExpense: false,
@@ -434,6 +558,13 @@ export default {
         amount: '',
       },
       expenseFieldErrors: {},
+      incomeForm: {
+        name: '',
+        description: '',
+        bookedAt: null,
+        amount: '',
+      },
+      incomeFieldErrors: {},
     }
   },
   computed: {
@@ -474,6 +605,24 @@ export default {
         this.expenseForm.amount !== ''
       )
     },
+    canSaveIncome() {
+      return (
+        this.incomeForm.name.trim() !== '' &&
+        this.incomeForm.bookedAt instanceof Date &&
+        this.incomeForm.amount !== ''
+      )
+    },
+  },
+  watch: {
+    focusYearId() {
+      if (!this.standalone || !this.focusYearId) {
+        return
+      }
+      this.selectedYearId = Number(this.focusYearId)
+      if (this.selectedYearId) {
+        this.loadYearData(this.selectedYearId)
+      }
+    },
   },
   async mounted() {
     await this.load()
@@ -485,7 +634,9 @@ export default {
       try {
         const data = await getFiscalYears()
         this.items = Array.isArray(data) ? data : []
-        if (!this.selectedYearId) {
+        if (this.standalone && this.focusYearId) {
+          this.selectedYearId = Number(this.focusYearId)
+        } else if (!this.selectedYearId) {
           const active = this.items.find((item) => item.isActive)
           if (active) {
             this.selectedYearId = active.id
@@ -493,7 +644,7 @@ export default {
             this.selectedYearId = this.items[0].id
           }
         }
-        if (this.selectedYearId) {
+        if (this.standalone && this.selectedYearId) {
           await this.loadYearData(this.selectedYearId)
         }
       } catch (e) {
@@ -513,25 +664,14 @@ export default {
       this.yearFieldErrors = {}
       this.error = ''
     },
-    async selectYear(item) {
+    openYearDetail(item) {
       if (!item?.id) {
         return
       }
-      this.selectedYearId = item.id
-      this.expandedYearId = item.id
-      await this.loadYearData(item.id)
+      this.$router.push({ name: 'fiscal-year-detail', params: { id: item.id } })
     },
-    async toggleYear(item) {
-      if (!item?.id) {
-        return
-      }
-      if (this.expandedYearId === item.id) {
-        this.expandedYearId = null
-        return
-      }
-      this.expandedYearId = item.id
-      this.selectedYearId = item.id
-      await this.loadYearData(item.id)
+    goToOverview() {
+      this.$router.push({ name: 'fiscal-year' })
     },
     async loadYearData(yearId) {
       await Promise.all([this.loadIncomes(yearId), this.loadExpenses(yearId)])
@@ -586,6 +726,19 @@ export default {
       this.expenseError = ''
       this.savedExpense = false
     },
+    resetIncomeForm() {
+      this.editingIncomeId = null
+      this.showIncomeModal = true
+      this.incomeForm = {
+        name: '',
+        description: '',
+        bookedAt: todayDate(),
+        amount: '',
+      }
+      this.incomeFieldErrors = {}
+      this.incomeError = ''
+      this.savedIncome = false
+    },
     closeExpenseModal() {
       this.showExpenseModal = false
       this.editingExpenseId = null
@@ -598,6 +751,18 @@ export default {
       this.expenseFieldErrors = {}
       this.expenseError = ''
     },
+    closeIncomeModal() {
+      this.showIncomeModal = false
+      this.editingIncomeId = null
+      this.incomeForm = {
+        name: '',
+        description: '',
+        bookedAt: null,
+        amount: '',
+      }
+      this.incomeFieldErrors = {}
+      this.incomeError = ''
+    },
     editExpense(expense) {
       this.editingExpenseId = expense.id
       this.showExpenseModal = true
@@ -605,10 +770,25 @@ export default {
         name: expense.name || '',
         description: expense.description || '',
         bookedAt: toDateFromTimestamp(expense.bookedAt),
-        amount: expense.amountCents ? (expense.amountCents / 100).toFixed(2) : '',
+        amount: inputFromCents(expense.amountCents),
       }
       this.expenseFieldErrors = {}
       this.expenseError = ''
+    },
+    editIncome(income) {
+      if (income.invoiceId) {
+        return
+      }
+      this.editingIncomeId = income.id
+      this.showIncomeModal = true
+      this.incomeForm = {
+        name: income.name || '',
+        description: income.description || '',
+        bookedAt: toDateFromTimestamp(income.bookedAt),
+        amount: inputFromCents(income.amountCents),
+      }
+      this.incomeFieldErrors = {}
+      this.incomeError = ''
     },
     async saveExpense() {
       if (!this.selectedYearId) {
@@ -635,8 +815,8 @@ export default {
         return
       }
 
-      const amount = Number(this.expenseForm.amount)
-      if (Number.isNaN(amount)) {
+      const amount = parseMoneyInput(this.expenseForm.amount)
+      if (amount === null) {
         this.expenseFieldErrors = { amount: 'Bitte einen gültigen Betrag angeben.' }
         return
       }
@@ -673,6 +853,70 @@ export default {
         this.savingExpense = false
       }
     },
+    async saveIncome() {
+      if (!this.selectedYearId) {
+        this.incomeError = 'Bitte ein Wirtschaftsjahr auswählen.'
+        return
+      }
+      if (!this.canSaveIncome) {
+        this.incomeFieldErrors = {}
+        if (!this.incomeForm.name.trim()) {
+          this.incomeFieldErrors.name = 'Bitte einen Namen angeben.'
+        }
+        if (!this.incomeForm.bookedAt) {
+          this.incomeFieldErrors.bookedAt = 'Bitte ein Datum angeben.'
+        }
+        if (this.incomeForm.amount === '') {
+          this.incomeFieldErrors.amount = 'Bitte einen Betrag angeben.'
+        }
+        return
+      }
+
+      const bookedAt = toTimestamp(this.incomeForm.bookedAt)
+      if (bookedAt === null) {
+        this.incomeFieldErrors = { bookedAt: 'Bitte ein gültiges Datum angeben.' }
+        return
+      }
+
+      const amount = parseMoneyInput(this.incomeForm.amount)
+      if (amount === null) {
+        this.incomeFieldErrors = { amount: 'Bitte einen gültigen Betrag angeben.' }
+        return
+      }
+
+      this.savingIncome = true
+      this.savedIncome = false
+      this.incomeError = ''
+
+      const payload = {
+        name: this.incomeForm.name.trim(),
+        description: this.incomeForm.description.trim(),
+        bookedAt,
+        amountCents: Math.round(amount * 100),
+        status: 'paid',
+      }
+
+      try {
+        if (this.editingIncomeId) {
+          const saved = await updateIncome(this.editingIncomeId, payload)
+          this.incomes = this.incomes.map((item) =>
+            item.id === this.editingIncomeId ? saved : item
+          )
+        } else {
+          const saved = await createIncome(this.selectedYearId, payload)
+          this.incomes = [saved, ...this.incomes]
+        }
+        this.savedIncome = true
+        window.setTimeout(() => {
+          this.savedIncome = false
+        }, 2000)
+        this.closeIncomeModal()
+      } catch (e) {
+        this.incomeError = 'Einnahme konnte nicht gespeichert werden.'
+      } finally {
+        this.savingIncome = false
+      }
+    },
     async removeExpense(expense) {
       if (!window.confirm('Ausgabe wirklich löschen?')) {
         return
@@ -682,6 +926,20 @@ export default {
         this.expenses = this.expenses.filter((item) => item.id !== expense.id)
       } catch (e) {
         this.expenseError = 'Ausgabe konnte nicht gelöscht werden.'
+      }
+    },
+    async removeIncome(income) {
+      if (income.invoiceId) {
+        return
+      }
+      if (!window.confirm('Einnahme wirklich löschen?')) {
+        return
+      }
+      try {
+        await deleteIncome(income.id)
+        this.incomes = this.incomes.filter((item) => item.id !== income.id)
+      } catch (e) {
+        this.incomeError = 'Einnahme konnte nicht gelöscht werden.'
       }
     },
     async markIncomePaid(income) {
@@ -803,10 +1061,7 @@ export default {
         }
         if (this.selectedYearId === item.id) {
           this.selectedYearId = this.items[0]?.id || null
-          if (this.expandedYearId === item.id) {
-            this.expandedYearId = this.selectedYearId
-          }
-          if (this.selectedYearId) {
+          if (this.standalone && this.selectedYearId) {
             await this.loadYearData(this.selectedYearId)
           } else {
             this.incomes = []
@@ -853,7 +1108,10 @@ export default {
       if (value === null || value === undefined) {
         return '–'
       }
-      return `${(Number(value) / 100).toFixed(2)} €`
+      return `${(Number(value) / 100).toLocaleString('de-DE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })} €`
     },
     incomeStatusLabel(status) {
       if (status === 'paid') {
@@ -873,6 +1131,18 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-header h1 {
+  margin: 0;
+  padding-left: 28px;
 }
 
 .layout {
@@ -1079,6 +1349,16 @@ export default {
 }
 
 .form-grid .form-group {
+  margin: 0;
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-stack .form-group {
   margin: 0;
 }
 

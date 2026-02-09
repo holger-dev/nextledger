@@ -119,9 +119,27 @@ import {
   updateProduct,
 } from '../api/products'
 
-const centsFromInput = (value) => {
-  const parsed = Number(value)
+const parseMoneyInput = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const raw = String(value).trim().replace(/\s/g, '')
+  if (!raw) {
+    return null
+  }
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw
+  const parsed = Number(normalized)
   if (Number.isNaN(parsed)) {
+    return null
+  }
+  return parsed
+}
+
+const centsFromInput = (value) => {
+  const parsed = parseMoneyInput(value)
+  if (parsed === null) {
     return null
   }
   return Math.round(parsed * 100)
@@ -131,7 +149,10 @@ const inputFromCents = (value) => {
   if (value === null || value === undefined) {
     return ''
   }
-  return (Number(value) / 100).toFixed(2)
+  return (Number(value) / 100).toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 export default {

@@ -25,19 +25,11 @@
         <NcTextField
           label="Absender (From)"
           :value.sync="form.fromEmail"
-          :placeholder="defaults.fromEmail || 'noreply@deine-domain'"
         />
-        <p class="hint">
-          Standard: {{ defaults.fromEmail || 'noreply@deine-domain' }}
-        </p>
         <NcTextField
           label="Antwortadresse (Reply-To)"
           :value.sync="form.replyToEmail"
-          :placeholder="defaults.replyToEmail || 'deine.email@domain'"
         />
-        <p class="hint">
-          Standard: {{ defaults.replyToEmail || 'deine.email@domain' }}
-        </p>
       </div>
 
       <div class="actions">
@@ -71,10 +63,6 @@ export default {
       saving: false,
       saved: false,
       error: '',
-      defaults: {
-        fromEmail: '',
-        replyToEmail: '',
-      },
       form: {
         mode: 'manual',
         fromEmail: '',
@@ -91,10 +79,6 @@ export default {
       this.error = ''
       try {
         const data = await getEmailBehavior()
-        this.defaults = {
-          fromEmail: data.defaultFromEmail || '',
-          replyToEmail: data.defaultReplyToEmail || '',
-        }
         this.form = {
           mode: data.mode || 'manual',
           fromEmail: data.fromEmail || '',

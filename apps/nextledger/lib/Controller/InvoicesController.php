@@ -313,6 +313,7 @@ class InvoicesController extends ApiController {
             $income->setAmountCents($invoice->getTotalCents());
             $income->setStatus($status);
             $income->setBookedAt($invoice->getIssueDate());
+            $income->setName($description);
             $income->setDescription($description);
             $income->setUpdatedAt(time());
             $this->incomeMapper->update($income);
@@ -325,6 +326,7 @@ class InvoicesController extends ApiController {
         $income->setAmountCents($invoice->getTotalCents());
         $income->setStatus($status);
         $income->setBookedAt($invoice->getIssueDate());
+        $income->setName($description);
         $income->setDescription($description);
         $income->setCreatedAt(time());
         $income->setUpdatedAt(time());

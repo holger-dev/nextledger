@@ -64,7 +64,7 @@ export default {
       form: {
         vatRatePercent: '19',
         isSmallBusiness: false,
-        smallBusinessNote: '',
+        smallBusinessNote: 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.',
       },
       fieldErrors: {},
     }
@@ -96,7 +96,7 @@ export default {
           return Boolean(value)
         }
         this.form.isSmallBusiness = parseBool(data.isSmallBusiness)
-        this.form.smallBusinessNote = data.smallBusinessNote || ''
+        this.form.smallBusinessNote = data.smallBusinessNote || this.form.smallBusinessNote
       } catch (e) {
         this.error = 'Daten konnten nicht geladen werden.'
       } finally {

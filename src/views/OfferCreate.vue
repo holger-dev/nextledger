@@ -69,20 +69,22 @@
             />
           </div>
           <div class="form-group">
-            <NcTextField
+            <NcDateTimePickerNative
+              id="offer-issue-date"
               label="Ausstellungsdatum *"
-              type="text"
-              placeholder="YYYY-MM-DD"
-              :value.sync="form.issueDate"
+              type="date"
+              :value="issueDatePicker"
+              @input="issueDatePicker = $event"
             />
             <p v-if="fieldErrors.issueDate" class="field-error">{{ fieldErrors.issueDate }}</p>
           </div>
           <div class="form-group">
-            <NcTextField
+            <NcDateTimePickerNative
+              id="offer-valid-until"
               label="Gültig bis"
-              type="text"
-              placeholder="YYYY-MM-DD"
-              :value.sync="form.validUntil"
+              type="date"
+              :value="validUntilPicker"
+              @input="validUntilPicker = $event"
             />
             <p v-if="fieldErrors.validUntil" class="field-error">{{ fieldErrors.validUntil }}</p>
           </div>
@@ -110,18 +112,19 @@
         <table class="table compact">
           <thead>
             <tr>
-              <th>Typ</th>
-              <th>Produkt</th>
+              <th class="col-type">Typ</th>
+              <th class="col-product">Produkt</th>
               <th>Bezeichnung</th>
-              <th>Menge</th>
+              <th>Beschreibung</th>
+              <th class="col-qty">Menge</th>
               <th class="price">Einzelpreis</th>
               <th class="price">Gesamt</th>
               <th class="actions">Aktion</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in form.items" :key="item.key">
-              <td>
+            <tr v-for="(item, index) in form.items" :key="item.key">
+              <td class="col-type">
                 <NcSelect
                   v-model="item.positionType"
                   :options="positionTypeOptions"
@@ -132,7 +135,7 @@
                   :label-outside="true"
                 />
               </td>
-              <td>
+              <td class="col-product">
                 <NcSelect
                   v-if="item.positionType === 'product'"
                   v-model="item.productId"
@@ -147,7 +150,7 @@
                   />
                 <span v-else>–</span>
               </td>
-              <td>
+              <td class="col-qty">
                 <NcTextField
                   v-if="item.positionType === 'custom'"
                   label="Bezeichnung"
@@ -155,6 +158,15 @@
                   :value.sync="item.name"
                 />
                 <span v-else>{{ item.name || '–' }}</span>
+              </td>
+              <td>
+                <NcTextField
+                  v-if="item.positionType === 'custom'"
+                  label="Beschreibung"
+                  placeholder="Beschreibung"
+                  :value.sync="item.description"
+                />
+                <span v-else>{{ item.description || '–' }}</span>
               </td>
               <td>
                 <NcTextField
@@ -183,6 +195,24 @@
                   <template #icon>
                     <TrashCanOutline :size="18" />
                   </template>
+                </NcButton>
+                <NcButton
+                  type="tertiary-no-background"
+                  aria-label="Position nach oben"
+                  title="Nach oben"
+                  :disabled="index === 0"
+                  @click="moveItemUp(index)"
+                >
+                  ↑
+                </NcButton>
+                <NcButton
+                  type="tertiary-no-background"
+                  aria-label="Position nach unten"
+                  title="Nach unten"
+                  :disabled="index === form.items.length - 1"
+                  @click="moveItemDown(index)"
+                >
+                  ↓
                 </NcButton>
               </td>
             </tr>
@@ -224,6 +254,7 @@
 import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
+import NcDateTimePickerNative from '@nextcloud/vue/dist/Components/NcDateTimePickerNative.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
 import { createOffer } from '../api/offers'
@@ -233,9 +264,27 @@ import { getCustomers } from '../api/customers'
 import { getProducts } from '../api/products'
 import { getTax, getTexts } from '../api/settings'
 
-const centsFromInput = (value) => {
-  const parsed = Number(value)
+const parseMoneyInput = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const raw = String(value).trim().replace(/\s/g, '')
+  if (!raw) {
+    return null
+  }
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw
+  const parsed = Number(normalized)
   if (Number.isNaN(parsed)) {
+    return null
+  }
+  return parsed
+}
+
+const centsFromInput = (value) => {
+  const parsed = parseMoneyInput(value)
+  if (parsed === null) {
     return null
   }
   return Math.round(parsed * 100)
@@ -245,7 +294,10 @@ const inputFromCents = (value) => {
   if (value === null || value === undefined) {
     return ''
   }
-  return (Number(value) / 100).toFixed(2)
+  return (Number(value) / 100).toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 const fromDateInput = (value) => {
@@ -260,6 +312,24 @@ const fromDateInput = (value) => {
 const toDateInput = (date) => {
   const pad = (value) => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+const toDateFromInput = (value) => {
+  if (!value) {
+    return null
+  }
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date
+}
+
+const toInputFromDate = (value) => {
+  if (!value || Number.isNaN(value.getTime?.())) {
+    return ''
+  }
+  return toDateInput(value)
 }
 
 const todayInput = () => toDateInput(new Date())
@@ -288,6 +358,7 @@ export default {
     NcSelect,
     NcTextArea,
     NcTextField,
+    NcDateTimePickerNative,
     TrashCanOutline,
   },
   data() {
@@ -319,6 +390,22 @@ export default {
     }
   },
   computed: {
+    issueDatePicker: {
+      get() {
+        return toDateFromInput(this.form.issueDate)
+      },
+      set(value) {
+        this.form.issueDate = toInputFromDate(value)
+      },
+    },
+    validUntilPicker: {
+      get() {
+        return toDateFromInput(this.form.validUntil)
+      },
+      set(value) {
+        this.form.validUntil = toInputFromDate(value)
+      },
+    },
     customerOptions() {
       return this.customers.map((customer) => ({
         label: customer.company || 'Unbenannt',
@@ -492,6 +579,22 @@ export default {
         this.form.items.push(createEmptyItem())
       }
     },
+    moveItemUp(index) {
+      if (index <= 0) {
+        return
+      }
+      const items = [...this.form.items]
+      ;[items[index - 1], items[index]] = [items[index], items[index - 1]]
+      this.form.items = items
+    },
+    moveItemDown(index) {
+      if (index >= this.form.items.length - 1) {
+        return
+      }
+      const items = [...this.form.items]
+      ;[items[index + 1], items[index]] = [items[index], items[index + 1]]
+      this.form.items = items
+    },
     syncFromProduct(item) {
       const product = this.products.find((entry) => entry.id === item.productId)
       if (!product) {
@@ -519,13 +622,19 @@ export default {
       if (value === null || value === undefined) {
         return '–'
       }
-      return `${(Number(value) / 100).toFixed(2)} €`
+      return `${(Number(value) / 100).toLocaleString('de-DE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })} €`
     },
     formatTaxRate(value) {
       if (value === null || value === undefined) {
         return '0 %'
       }
-      return `${(Number(value) / 100).toFixed(2)} %`
+      return `${(Number(value) / 100).toLocaleString('de-DE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })} %`
     },
     isValidDateInput(value) {
       if (!value) {
@@ -701,21 +810,41 @@ export default {
 .table td.price {
   text-align: right;
   white-space: nowrap;
+  width: clamp(90px, 10vw, 120px);
 }
 
 .table th.actions,
 .table td.actions {
   text-align: right;
   white-space: nowrap;
+  min-width: 160px;
 }
 
-.table td.actions > * {
-  margin-left: 8px;
+.table td.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table th.col-type,
+.table td.col-type {
+  width: clamp(40px, 5vw, 65px);
+}
+
+.table th.col-product,
+.table td.col-product {
+  width: clamp(90px, 11vw, 150px);
+}
+
+.table th.col-qty,
+.table td.col-qty {
+  width: clamp(70px, 8vw, 90px);
 }
 
 .table td.name {
   font-weight: 600;
 }
+
 
 .form-grid {
   display: grid;
@@ -767,6 +896,8 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
+  max-width: 860px;
 }
 
 .divider {

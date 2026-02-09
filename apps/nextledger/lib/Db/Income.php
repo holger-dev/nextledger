@@ -10,6 +10,7 @@ class Income extends Entity {
     public $id;
     public $fiscalYearId;
     public $invoiceId;
+    public $name;
     public $amountCents;
     public $status;
     public $bookedAt;
@@ -20,6 +21,7 @@ class Income extends Entity {
     public function __construct() {
         $this->addType('fiscalYearId', 'integer');
         $this->addType('invoiceId', 'integer');
+        $this->addType('name', 'string');
         $this->addType('amountCents', 'integer');
         $this->addType('status', 'string');
         $this->addType('bookedAt', 'integer');

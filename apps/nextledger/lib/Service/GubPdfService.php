@@ -75,9 +75,10 @@ class GubPdfService {
         $incomeTotal = 0;
         foreach ($incomes as $income) {
             $incomeTotal += (int)($income->getAmountCents() ?? 0);
+            $incomeName = $income->getName() ?: $income->getDescription() ?: 'Einnahme';
             $incomeRows .= sprintf(
                 '<tr><td>%s</td><td>%s</td><td style="text-align:right">%s</td><td>%s</td></tr>',
-                $this->escape($income->getDescription() ?: 'Einnahme'),
+                $this->escape($incomeName),
                 $this->formatDate($income->getBookedAt()),
                 $this->formatMoney($income->getAmountCents()),
                 $this->escape($income->getStatus() ?: 'offen')

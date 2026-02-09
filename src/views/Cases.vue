@@ -111,11 +111,35 @@
                     </tr>
                     <tr>
                       <th>Deck</th>
-                      <td>{{ item.deckLink || '–' }}</td>
+                      <td>
+                        <a
+                          v-if="item.deckLink"
+                          class="detail-link"
+                          :href="item.deckLink"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Link öffnen
+                          <OpenInNew :size="16" />
+                        </a>
+                        <span v-else>–</span>
+                      </td>
                     </tr>
                     <tr>
                       <th>Kollektiv</th>
-                      <td>{{ item.kollektivLink || '–' }}</td>
+                      <td>
+                        <a
+                          v-if="item.kollektivLink"
+                          class="detail-link"
+                          :href="item.kollektivLink"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Link öffnen
+                          <OpenInNew :size="16" />
+                        </a>
+                        <span v-else>–</span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -641,6 +665,7 @@ import DownloadBoxOutline from 'vue-material-design-icons/DownloadBoxOutline.vue
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
 import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
+import OpenInNew from 'vue-material-design-icons/OpenInNew.vue'
 import axios from '@nextcloud/axios'
 import { generateRemoteUrl } from '@nextcloud/router'
 import { getFilePickerBuilder, showError, showSuccess } from '@nextcloud/dialogs'
@@ -689,6 +714,7 @@ export default {
     Pencil,
     EmailOutline,
     TrashCanOutline,
+    OpenInNew,
   },
   data() {
     return {
@@ -1461,7 +1487,10 @@ export default {
       if (value === null || value === undefined) {
         return '–'
       }
-      return `${(Number(value) / 100).toFixed(2)} €`
+      return `${(Number(value) / 100).toLocaleString('de-DE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })} €`
     },
     formatDate(value) {
       if (!value) {
@@ -1872,7 +1901,7 @@ export default {
 .detail-table th,
 .detail-table td {
   text-align: left;
-  padding: 4px 0;
+  padding: 8px 0;
   vertical-align: top;
 }
 
@@ -1888,6 +1917,19 @@ export default {
   flex-wrap: wrap;
   gap: 4px;
   justify-content: flex-start;
+}
+
+.detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary, #1d4ed8);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.detail-link:hover {
+  text-decoration: underline;
 }
 
 .detail-divider {

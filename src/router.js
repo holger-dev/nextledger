@@ -38,6 +38,12 @@ export default new Router({
     { path: '/offers/:id/edit', name: 'offers-edit', component: OfferEdit },
     { path: '/products', name: 'products', component: Products },
     { path: '/fiscal-year', name: 'fiscal-year', component: FiscalYear },
+    {
+      path: '/fiscal-year/:id',
+      name: 'fiscal-year-detail',
+      component: FiscalYear,
+      props: (route) => ({ standalone: true, focusYearId: route.params.id }),
+    },
     { path: '/settings/company', name: 'settings-company', component: SettingsCompany },
     { path: '/settings/texts', name: 'settings-texts', component: SettingsTexts },
     { path: '/settings/tax', name: 'settings-tax', component: SettingsTax },
