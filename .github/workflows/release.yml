@@ -47,19 +47,20 @@ jobs:
           version: ${{ matrix.nextcloud }}
           database-type: ${{ matrix.database }}
 
-      - name: Copy app into Nextcloud server
+      - name: Prepare release app workspace
         run: |
+          mkdir -p ../release-app/${{ env.APP_NAME }}
           rsync -a --delete \
             --exclude ".git" \
             --exclude ".github" \
             --exclude "node_modules" \
             --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
             ./apps/${{ env.APP_NAME }}/ \
-            ../server/apps/${{ env.APP_NAME }}/
+            ../release-app/${{ env.APP_NAME }}/
 
       - name: Install PHP dependencies (composer --no-dev)
         run: |
-          cd ../server/apps/${{ env.APP_NAME }}
+          cd ../release-app/${{ env.APP_NAME }}
           if [ -f composer.json ]; then
             composer install --no-dev --prefer-dist --optimize-autoloader
           fi
@@ -74,17 +75,17 @@ jobs:
 
       - name: Create signed release archive (make appstore)
         run: |
-          cd ../server/apps/${{ env.APP_NAME }}
+          cd ../release-app/${{ env.APP_NAME }}
           chmod -R u+rwX .
           mkdir -p appinfo
-          make appstore APP_NAME=${{ env.APP_NAME }}
+          make appstore APP_NAME=${{ env.APP_NAME }} OCC="${{ github.workspace }}/../server/occ"
 
       - name: Upload app tarball to GitHub release
         uses: svenstaro/upload-release-action@v2
         id: attach_to_release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ../server/apps/${{ env.APP_NAME }}/build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
+          file: ../release-app/${{ env.APP_NAME }}/build/artifacts/appstore/${{ env.APP_NAME }}.tar.gz
           asset_name: ${{ env.APP_NAME }}.tar.gz
           tag: ${{ github.ref }}
           overwrite: true
