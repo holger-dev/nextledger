@@ -53,6 +53,7 @@ jobs:
             --exclude ".git" \
             --exclude ".github" \
             --exclude "node_modules" \
+            --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
             ./apps/${{ env.APP_NAME }}/ \
             ../server/apps/${{ env.APP_NAME }}/
 
@@ -74,6 +75,8 @@ jobs:
       - name: Create signed release archive (make appstore)
         run: |
           cd ../server/apps/${{ env.APP_NAME }}
+          chmod -R u+rwX .
+          mkdir -p appinfo
           make appstore APP_NAME=${{ env.APP_NAME }}
 
       - name: Upload app tarball to GitHub release
