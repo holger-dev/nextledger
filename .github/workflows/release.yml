@@ -73,8 +73,28 @@ jobs:
           mkdir -p ~/.nextcloud/certificates
           printf "%s" "${{ secrets.APP_PRIVATE_KEY }}" > ~/.nextcloud/certificates/${{ env.APP_NAME }}.key
           printf "%s" "${{ secrets.APP_PUBLIC_CRT }}"  > ~/.nextcloud/certificates/${{ env.APP_NAME }}.crt
+          # Normalize accidental Windows line endings from copied secrets.
+          sed -i 's/\r$//' ~/.nextcloud/certificates/${{ env.APP_NAME }}.key
+          sed -i 's/\r$//' ~/.nextcloud/certificates/${{ env.APP_NAME }}.crt
           chmod 600 ~/.nextcloud/certificates/${{ env.APP_NAME }}.key
           chmod 644 ~/.nextcloud/certificates/${{ env.APP_NAME }}.crt
+
+      - name: Validate app signing key/certificate
+        run: |
+          KEY=~/.nextcloud/certificates/${{ env.APP_NAME }}.key
+          CRT=~/.nextcloud/certificates/${{ env.APP_NAME }}.crt
+
+          # Parse checks: fail early with clear error if secrets are malformed.
+          openssl pkey -in "$KEY" -noout >/dev/null
+          openssl x509 -in "$CRT" -noout >/dev/null
+
+          KEY_FP="$(openssl pkey -in "$KEY" -pubout -outform PEM | openssl dgst -sha256 | sed 's/^.*= //')"
+          CRT_FP="$(openssl x509 -in "$CRT" -pubkey -noout | openssl pkey -pubin -outform PEM | openssl dgst -sha256 | sed 's/^.*= //')"
+          if [ "$KEY_FP" != "$CRT_FP" ]; then
+            echo "Private key and certificate do not match."
+            echo "Please update APP_PRIVATE_KEY / APP_PUBLIC_CRT with a matching pair."
+            exit 1
+          fi
 
       - name: Create signed release archive (make appstore)
         run: |
