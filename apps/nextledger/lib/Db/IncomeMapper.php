@@ -16,7 +16,7 @@ class IncomeMapper extends BaseMapper {
     /**
      * @return Income[]
      */
-    public function findByFiscalYearId(int $fiscalYearId): array {
+    public function findByFiscalYearId(int $fiscalYearId, int $companyId): array {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -24,6 +24,15 @@ class IncomeMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'fiscal_year_id',
                     $qb->createNamedParameter($fiscalYearId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('booked_at', 'DESC');
@@ -31,7 +40,7 @@ class IncomeMapper extends BaseMapper {
         return $this->findEntities($qb);
     }
 
-    public function findByInvoiceId(int $invoiceId): ?Income {
+    public function findByInvoiceId(int $invoiceId, int $companyId): ?Income {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -39,6 +48,15 @@ class IncomeMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'invoice_id',
                     $qb->createNamedParameter($invoiceId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->setMaxResults(1);

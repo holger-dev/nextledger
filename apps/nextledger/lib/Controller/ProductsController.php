@@ -6,6 +6,7 @@ namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\Product;
 use OCA\NextLedger\Db\ProductMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -18,6 +19,7 @@ class ProductsController extends ApiController {
         string $appName,
         IRequest $request,
         private ProductMapper $productMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -27,7 +29,8 @@ class ProductsController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(): JSONResponse {
-        $items = $this->productMapper->findAll();
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $items = $this->productMapper->findAllByCompanyId($companyId);
         $data = array_map(fn(Product $product) => $this->entityToArray($product), $items);
 
         usort($data, static fn(array $a, array $b) => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
@@ -44,7 +47,9 @@ class ProductsController extends ApiController {
         ?string $description = null,
         ?int $unitPriceCents = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $product = new Product();
+        $product->setCompanyId($companyId);
         $product->setName($name);
         $product->setDescription($description);
         $product->setUnitPriceCents($unitPriceCents);
@@ -65,14 +70,16 @@ class ProductsController extends ApiController {
         ?string $description = null,
         ?int $unitPriceCents = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $productId = (int)$id;
         try {
             /** @var Product $product */
-            $product = $this->productMapper->find($productId);
+            $product = $this->productMapper->findByIdAndCompanyId($productId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Produkt nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
+        $product->setCompanyId($companyId);
         $product->setName($name);
         $product->setDescription($description);
         $product->setUnitPriceCents($unitPriceCents);
@@ -87,10 +94,11 @@ class ProductsController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $productId = (int)$id;
         try {
             /** @var Product $product */
-            $product = $this->productMapper->find($productId);
+            $product = $this->productMapper->findByIdAndCompanyId($productId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Produkt nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }

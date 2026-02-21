@@ -13,19 +13,25 @@ class FiscalYearMapper extends BaseMapper {
         parent::__construct($db, 'nl_fiscal_years', FiscalYear::class);
     }
 
-    public function deactivateAllExcept(?int $id): void {
+    public function deactivateAllExcept(?int $id, int $companyId): void {
         $qb = $this->db->getQueryBuilder();
         $qb->update($this->tableName)
-            ->set('is_active', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT));
+            ->set('is_active', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT))
+            ->where(
+                $qb->expr()->orX(
+                    $qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)),
+                    $qb->expr()->isNull('company_id')
+                )
+            );
 
         if ($id !== null) {
-            $qb->where($qb->expr()->neq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)));
+            $qb->andWhere($qb->expr()->neq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)));
         }
 
         $qb->executeStatement();
     }
 
-    public function findActive(): ?FiscalYear {
+    public function findActive(int $companyId): ?FiscalYear {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -33,6 +39,12 @@ class FiscalYearMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'is_active',
                     $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->setMaxResults(1);
@@ -41,7 +53,7 @@ class FiscalYearMapper extends BaseMapper {
         return $items[0] ?? null;
     }
 
-    public function findByDate(int $timestamp): ?FiscalYear {
+    public function findByDate(int $timestamp, int $companyId): ?FiscalYear {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -55,6 +67,12 @@ class FiscalYearMapper extends BaseMapper {
                 $qb->expr()->gte(
                     'date_end',
                     $qb->createNamedParameter($timestamp, IQueryBuilder::PARAM_INT)
+                )
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('date_start', 'DESC')

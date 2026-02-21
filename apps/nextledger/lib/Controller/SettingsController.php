@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace OCA\NextLedger\Controller;
 
+use OCA\NextLedger\Db\BaseMapper;
 use OCA\NextLedger\Db\Company;
 use OCA\NextLedger\Db\CompanyMapper;
+use OCA\NextLedger\Db\DocumentSetting;
+use OCA\NextLedger\Db\DocumentSettingMapper;
 use OCA\NextLedger\Db\MiscSetting;
 use OCA\NextLedger\Db\MiscSettingMapper;
 use OCA\NextLedger\Db\TaxSetting;
 use OCA\NextLedger\Db\TaxSettingMapper;
 use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCA\NextLedger\Service\EmailSettingsService;
 use OCP\AppFramework\ApiController;
+use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
@@ -25,6 +30,8 @@ class SettingsController extends ApiController {
         private TextsMapper $textsMapper,
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
+        private DocumentSettingMapper $documentSettingMapper,
+        private ActiveCompanyService $activeCompanyService,
         private EmailSettingsService $emailSettingsService,
     ) {
         parent::__construct($appName, $request);
@@ -34,9 +41,105 @@ class SettingsController extends ApiController {
      * @NoAdminRequired
      * @NoCSRFRequired
      */
+    public function getCompanies(): JSONResponse {
+        $companies = array_map(
+            fn(Company $company) => $this->entityToArray($company),
+            $this->activeCompanyService->getCompanies()
+        );
+
+        return new JSONResponse([
+            'companies' => $companies,
+            'activeCompanyId' => $this->activeCompanyService->getActiveCompanyId(),
+        ]);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function createCompany(
+        ?string $name = null,
+        ?string $ownerName = null,
+        ?string $street = null,
+        ?string $houseNumber = null,
+        ?string $zip = null,
+        ?string $city = null,
+        ?string $email = null,
+        ?string $phone = null,
+        ?string $vatId = null,
+        ?string $taxId = null,
+    ): JSONResponse {
+        $company = new Company();
+        $company->setName($name ?: 'Neue Firma');
+        $company->setOwnerName($ownerName);
+        $company->setStreet($street);
+        $company->setHouseNumber($houseNumber);
+        $company->setZip($zip);
+        $company->setCity($city);
+        $company->setEmail($email);
+        $company->setPhone($phone);
+        $company->setVatId($vatId);
+        $company->setTaxId($taxId);
+
+        /** @var Company $saved */
+        $saved = $this->companyMapper->insert($company);
+        $this->activeCompanyService->setActiveCompanyId((int)$saved->getId());
+
+        return new JSONResponse($this->entityToArray($saved));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function activateCompany(string $id): JSONResponse {
+        try {
+            $company = $this->activeCompanyService->setActiveCompanyId((int)$id);
+        } catch (\InvalidArgumentException $e) {
+            return new JSONResponse(['message' => 'Firma nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        return new JSONResponse($this->entityToArray($company));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function deleteCompany(string $id): JSONResponse {
+        $companyId = (int)$id;
+        $companies = $this->activeCompanyService->getCompanies();
+        if (count($companies) <= 1) {
+            return new JSONResponse(['message' => 'Mindestens eine Firma muss vorhanden bleiben.'], Http::STATUS_BAD_REQUEST);
+        }
+
+        $target = null;
+        foreach ($companies as $company) {
+            if ((int)$company->getId() === $companyId) {
+                $target = $company;
+                break;
+            }
+        }
+        if ($target === null) {
+            return new JSONResponse(['message' => 'Firma nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $activeId = $this->activeCompanyService->getActiveCompanyId();
+        if ($activeId === $companyId) {
+            return new JSONResponse(['message' => 'Aktive Firma kann nicht gelöscht werden.'], Http::STATUS_BAD_REQUEST);
+        }
+        $this->companyMapper->delete($target);
+
+        return new JSONResponse(['status' => 'ok']);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
     public function getCompany(): JSONResponse {
-        $company = $this->getSingleton($this->companyMapper, Company::class);
-        return new JSONResponse($company);
+        $company = $this->activeCompanyService->getActiveCompany();
+        return new JSONResponse($this->entityToArray($company));
     }
 
     /**
@@ -55,8 +158,7 @@ class SettingsController extends ApiController {
         ?string $vatId = null,
         ?string $taxId = null,
     ): JSONResponse {
-        /** @var Company $company */
-        $company = $this->getSingletonEntity($this->companyMapper, Company::class);
+        $company = $this->activeCompanyService->getActiveCompany();
         $company->setName($name);
         $company->setOwnerName($ownerName);
         $company->setStreet($street);
@@ -67,9 +169,10 @@ class SettingsController extends ApiController {
         $company->setPhone($phone);
         $company->setVatId($vatId);
         $company->setTaxId($taxId);
-        $saved = $this->persistSingleton($this->companyMapper, $company);
+        /** @var Company $saved */
+        $saved = $this->companyMapper->update($company);
 
-        return new JSONResponse($saved);
+        return new JSONResponse($this->entityToArray($saved));
     }
 
     /**
@@ -77,7 +180,8 @@ class SettingsController extends ApiController {
      * @NoCSRFRequired
      */
     public function getTexts(): JSONResponse {
-        $texts = $this->getSingleton($this->textsMapper, Texts::class);
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $texts = $this->getScopedSingleton($this->textsMapper, Texts::class, $companyId);
         return new JSONResponse($texts);
     }
 
@@ -96,8 +200,10 @@ class SettingsController extends ApiController {
         ?string $invoiceEmailSubject = null,
         ?string $invoiceEmailBody = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         /** @var Texts $texts */
-        $texts = $this->getSingletonEntity($this->textsMapper, Texts::class);
+        $texts = $this->getScopedSingletonEntity($this->textsMapper, Texts::class, $companyId);
+        $texts->setCompanyId($companyId);
         $texts->setInvoiceGreeting($invoiceGreeting);
         $texts->setOfferGreeting($offerGreeting);
         $texts->setFooterText($footerText);
@@ -107,7 +213,7 @@ class SettingsController extends ApiController {
         $texts->setOfferEmailBody($offerEmailBody);
         $texts->setInvoiceEmailSubject($invoiceEmailSubject);
         $texts->setInvoiceEmailBody($invoiceEmailBody);
-        $saved = $this->persistSingleton($this->textsMapper, $texts);
+        $saved = $this->persistScopedSingleton($this->textsMapper, $texts);
 
         return new JSONResponse($saved);
     }
@@ -117,7 +223,8 @@ class SettingsController extends ApiController {
      * @NoCSRFRequired
      */
     public function getTax(): JSONResponse {
-        $tax = $this->getSingleton($this->taxSettingMapper, TaxSetting::class);
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $tax = $this->getScopedSingleton($this->taxSettingMapper, TaxSetting::class, $companyId);
         $tax['isSmallBusiness'] = (bool)($tax['isSmallBusiness'] ?? false);
         return new JSONResponse($tax);
     }
@@ -131,8 +238,10 @@ class SettingsController extends ApiController {
         ?bool $isSmallBusiness = null,
         ?string $smallBusinessNote = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         /** @var TaxSetting $tax */
-        $tax = $this->getSingletonEntity($this->taxSettingMapper, TaxSetting::class);
+        $tax = $this->getScopedSingletonEntity($this->taxSettingMapper, TaxSetting::class, $companyId);
+        $tax->setCompanyId($companyId);
         $params = $this->request->getParams();
         if ($vatRateBp === null) {
             $vatRateBp = (int)($params['vatRateBp'] ?? $this->request->getParam('vatRateBp', 0));
@@ -150,7 +259,7 @@ class SettingsController extends ApiController {
         $tax->setVatRateBp($vatRateBp);
         $tax->setIsSmallBusiness((bool)$rawSmallBusiness);
         $tax->setSmallBusinessNote($smallBusinessNote);
-        $saved = $this->persistSingleton($this->taxSettingMapper, $tax);
+        $saved = $this->persistScopedSingleton($this->taxSettingMapper, $tax);
         $saved['isSmallBusiness'] = (bool)($saved['isSmallBusiness'] ?? false);
 
         return new JSONResponse($saved);
@@ -161,7 +270,8 @@ class SettingsController extends ApiController {
      * @NoCSRFRequired
      */
     public function getMisc(): JSONResponse {
-        $misc = $this->getSingleton($this->miscSettingMapper, MiscSetting::class);
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $misc = $this->getScopedSingleton($this->miscSettingMapper, MiscSetting::class, $companyId);
         return new JSONResponse($misc);
     }
 
@@ -176,16 +286,61 @@ class SettingsController extends ApiController {
         ?string $bic = null,
         ?string $accountHolder = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         /** @var MiscSetting $misc */
-        $misc = $this->getSingletonEntity($this->miscSettingMapper, MiscSetting::class);
+        $misc = $this->getScopedSingletonEntity($this->miscSettingMapper, MiscSetting::class, $companyId);
+        $misc->setCompanyId($companyId);
         $misc->setPaymentTermsDays($paymentTermsDays);
         $misc->setBankName($bankName);
         $misc->setIban($iban);
         $misc->setBic($bic);
         $misc->setAccountHolder($accountHolder);
-        $saved = $this->persistSingleton($this->miscSettingMapper, $misc);
+        $saved = $this->persistScopedSingleton($this->miscSettingMapper, $misc);
 
         return new JSONResponse($saved);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function getDocuments(): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        /** @var DocumentSetting $setting */
+        $setting = $this->getScopedSingletonEntity($this->documentSettingMapper, DocumentSetting::class, $companyId);
+
+        return new JSONResponse([
+            'autoStorePdfs' => (bool)$setting->getAutoStorePdfs(),
+            'keepPdfVersions' => (bool)$setting->getKeepPdfVersions(),
+        ]);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function saveDocuments(?bool $autoStorePdfs = null, ?bool $keepPdfVersions = null): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        /** @var DocumentSetting $setting */
+        $setting = $this->getScopedSingletonEntity($this->documentSettingMapper, DocumentSetting::class, $companyId);
+        $setting->setCompanyId($companyId);
+
+        $params = $this->request->getParams();
+        if ($autoStorePdfs === null) {
+            $autoStorePdfs = (bool)($params['autoStorePdfs'] ?? false);
+        }
+        if ($keepPdfVersions === null) {
+            $keepPdfVersions = (bool)($params['keepPdfVersions'] ?? false);
+        }
+
+        $setting->setAutoStorePdfs((bool)$autoStorePdfs);
+        $setting->setKeepPdfVersions((bool)$keepPdfVersions);
+        $saved = $this->persistScopedSingleton($this->documentSettingMapper, $setting);
+
+        return new JSONResponse([
+            'autoStorePdfs' => (bool)($saved['autoStorePdfs'] ?? false),
+            'keepPdfVersions' => (bool)($saved['keepPdfVersions'] ?? false),
+        ]);
     }
 
     /**
@@ -219,21 +374,25 @@ class SettingsController extends ApiController {
         return new JSONResponse($this->emailSettingsService->saveSettings($mode, $fromEmail, $replyToEmail));
     }
 
-    private function getSingleton(object $mapper, string $entityClass): array {
-        $entity = $this->getSingletonEntity($mapper, $entityClass);
+    private function getScopedSingleton(BaseMapper $mapper, string $entityClass, int $companyId): array {
+        $entity = $this->getScopedSingletonEntity($mapper, $entityClass, $companyId);
         return $this->entityToArray($entity);
     }
 
-    private function getSingletonEntity(object $mapper, string $entityClass): object {
-        $items = $mapper->findAll(1, 0);
+    private function getScopedSingletonEntity(BaseMapper $mapper, string $entityClass, int $companyId): object {
+        $items = $mapper->findAllByCompanyId($companyId, 1, 0);
         if (!empty($items)) {
             return $items[0];
         }
 
-        return new $entityClass();
+        $entity = new $entityClass();
+        if (method_exists($entity, 'setCompanyId')) {
+            $entity->setCompanyId($companyId);
+        }
+        return $entity;
     }
 
-    private function persistSingleton(object $mapper, object $entity): array {
+    private function persistScopedSingleton(BaseMapper $mapper, object $entity): array {
         if ($entity->getId() === null) {
             $entity = $mapper->insert($entity);
         } else {

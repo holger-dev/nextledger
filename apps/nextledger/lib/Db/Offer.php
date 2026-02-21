@@ -8,6 +8,7 @@ use OCP\AppFramework\Db\Entity;
 
 class Offer extends Entity {
     public $id;
+    public $companyId;
     public $caseId;
     public $customerId;
     public $number;
@@ -27,6 +28,7 @@ class Offer extends Entity {
     public $updatedAt;
 
     public function __construct() {
+        $this->addType('companyId', 'integer');
         $this->addType('caseId', 'integer');
         $this->addType('customerId', 'integer');
         $this->addType('number', 'string');

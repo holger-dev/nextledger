@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace OCA\NextLedger\Controller;
 
+use OCA\NextLedger\Db\CaseEntityMapper;
+use OCA\NextLedger\Db\CustomerMapper;
 use OCA\NextLedger\Db\Offer;
 use OCA\NextLedger\Db\OfferMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
+use OCA\NextLedger\Service\DocumentStorageService;
 use OCA\NextLedger\Service\EmailSettingsService;
-use OCA\NextLedger\Service\OfferPdfService;
 use OCA\NextLedger\Service\NumberGenerator;
+use OCA\NextLedger\Service\OfferPdfService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -28,6 +32,10 @@ class OffersController extends ApiController {
         private OfferPdfService $offerPdfService,
         private IMailer $mailer,
         private EmailSettingsService $emailSettingsService,
+        private CaseEntityMapper $caseMapper,
+        private CustomerMapper $customerMapper,
+        private ActiveCompanyService $activeCompanyService,
+        private DocumentStorageService $documentStorageService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -37,6 +45,8 @@ class OffersController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(?string $caseId = null, ?string $customerId = null): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+
         $caseFilter = null;
         if ($caseId !== null && $caseId !== '') {
             $caseFilter = (int)$caseId;
@@ -48,11 +58,11 @@ class OffersController extends ApiController {
         }
 
         if ($caseFilter !== null) {
-            $items = $this->offerMapper->findByCaseId($caseFilter);
+            $items = $this->offerMapper->findByCaseId($caseFilter, $companyId);
         } elseif ($customerFilter !== null) {
-            $items = $this->offerMapper->findByCustomerId($customerFilter);
+            $items = $this->offerMapper->findByCustomerId($customerFilter, $companyId);
         } else {
-            $items = $this->offerMapper->findAll();
+            $items = $this->offerMapper->findAllByCompanyId($companyId);
         }
 
         $data = array_map(fn(Offer $offer) => $this->entityToArray($offer), $items);
@@ -66,10 +76,11 @@ class OffersController extends ApiController {
      * @NoCSRFRequired
      */
     public function show(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $offerId = (int)$id;
         try {
             /** @var Offer $offer */
-            $offer = $this->offerMapper->find($offerId);
+            $offer = $this->offerMapper->findByIdAndCompanyId($offerId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -97,10 +108,19 @@ class OffersController extends ApiController {
         ?int $taxRateBp = null,
         ?bool $isSmallBusiness = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         if ($caseId === null) {
             return new JSONResponse(['message' => 'Vorgang erforderlich.'], Http::STATUS_BAD_REQUEST);
         }
+        if (!$this->caseExistsInCompany($caseId, $companyId)) {
+            return new JSONResponse(['message' => 'Vorgang nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+        if ($customerId !== null && !$this->customerExistsInCompany($customerId, $companyId)) {
+            return new JSONResponse(['message' => 'Kunde nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+
         $offer = new Offer();
+        $offer->setCompanyId($companyId);
         $offer->setCaseId($caseId);
         $offer->setCustomerId($customerId);
         $offer->setNumber($number ?: $this->numberGenerator->nextOfferNumber());
@@ -143,10 +163,11 @@ class OffersController extends ApiController {
         ?int $taxRateBp = null,
         ?bool $isSmallBusiness = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $offerId = (int)$id;
         try {
             /** @var Offer $offer */
-            $offer = $this->offerMapper->find($offerId);
+            $offer = $this->offerMapper->findByIdAndCompanyId($offerId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -154,6 +175,14 @@ class OffersController extends ApiController {
         if ($caseId === null) {
             return new JSONResponse(['message' => 'Vorgang erforderlich.'], Http::STATUS_BAD_REQUEST);
         }
+        if (!$this->caseExistsInCompany($caseId, $companyId)) {
+            return new JSONResponse(['message' => 'Vorgang nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+        if ($customerId !== null && !$this->customerExistsInCompany($customerId, $companyId)) {
+            return new JSONResponse(['message' => 'Kunde nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+
+        $offer->setCompanyId($companyId);
         $offer->setCaseId($caseId);
         $offer->setCustomerId($customerId);
         if ($number !== null && $number !== '') {
@@ -181,10 +210,11 @@ class OffersController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $offerId = (int)$id;
         try {
             /** @var Offer $offer */
-            $offer = $this->offerMapper->find($offerId);
+            $offer = $this->offerMapper->findByIdAndCompanyId($offerId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -198,8 +228,11 @@ class OffersController extends ApiController {
      * @NoCSRFRequired
      */
     public function pdf(string $id): Response {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $offerId = (int)$id;
         try {
+            /** @var Offer $offer */
+            $offer = $this->offerMapper->findByIdAndCompanyId($offerId, $companyId);
             $result = $this->offerPdfService->buildPdf($offerId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
@@ -207,11 +240,14 @@ class OffersController extends ApiController {
             return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
 
-        /** @var Offer $offer */
-        $offer = $this->offerMapper->find($offerId);
         $offer->setPdfGeneratedAt(time());
         $offer->setUpdatedAt(time());
         $this->offerMapper->update($offer);
+        $this->documentStorageService->storeGeneratedPdf(
+            (string)($offer->getNumber() ?: ('offer-' . $offer->getId())),
+            $offer->getIssueDate(),
+            $result['content']
+        );
 
         return new DataDownloadResponse(
             $result['content'],
@@ -225,10 +261,11 @@ class OffersController extends ApiController {
      * @NoCSRFRequired
      */
     public function sendEmail(string $id, ?array $to = null, ?string $subject = null, ?string $body = null): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $offerId = (int)$id;
         try {
             /** @var Offer $offer */
-            $offer = $this->offerMapper->find($offerId);
+            $offer = $this->offerMapper->findByIdAndCompanyId($offerId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -245,6 +282,11 @@ class OffersController extends ApiController {
 
         try {
             $result = $this->offerPdfService->buildPdf($offer->getId());
+            $this->documentStorageService->storeGeneratedPdf(
+                (string)($offer->getNumber() ?: ('offer-' . $offer->getId())),
+                $offer->getIssueDate(),
+                $result['content']
+            );
         } catch (\Throwable $e) {
             return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
@@ -256,6 +298,24 @@ class OffersController extends ApiController {
         }
 
         return new JSONResponse(['status' => 'sent']);
+    }
+
+    private function caseExistsInCompany(int $caseId, int $companyId): bool {
+        try {
+            $this->caseMapper->findByIdAndCompanyId($caseId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
+    }
+
+    private function customerExistsInCompany(int $customerId, int $companyId): bool {
+        try {
+            $this->customerMapper->findByIdAndCompanyId($customerId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
     }
 
     private function normalizeRecipients(mixed $value): array {

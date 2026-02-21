@@ -16,7 +16,7 @@ class CaseElementMapper extends BaseMapper {
     /**
      * @return CaseElement[]
      */
-    public function findByCaseId(int $caseId): array {
+    public function findByCaseId(int $caseId, int $companyId): array {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -24,6 +24,15 @@ class CaseElementMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'case_id',
                     $qb->createNamedParameter($caseId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('created_at', 'ASC');

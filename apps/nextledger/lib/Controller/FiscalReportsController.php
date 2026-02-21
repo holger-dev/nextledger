@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OCA\NextLedger\Controller;
 
+use OCA\NextLedger\Db\FiscalYearMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCA\NextLedger\Service\GubPdfService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -19,6 +21,8 @@ class FiscalReportsController extends ApiController {
         string $appName,
         IRequest $request,
         private GubPdfService $gubPdfService,
+        private FiscalYearMapper $fiscalYearMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -28,8 +32,10 @@ class FiscalReportsController extends ApiController {
      * @NoCSRFRequired
      */
     public function gubPdf(string $id): Response {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $yearId = (int)$id;
         try {
+            $this->fiscalYearMapper->findByIdAndCompanyId($yearId, $companyId);
             $result = $this->gubPdfService->buildPdf($yearId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Wirtschaftsjahr nicht gefunden.'], Http::STATUS_NOT_FOUND);

@@ -12,6 +12,7 @@ use OCA\NextLedger\Db\FiscalYear;
 use OCA\NextLedger\Db\FiscalYearMapper;
 use OCA\NextLedger\Db\Income;
 use OCA\NextLedger\Db\IncomeMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\IConfig;
@@ -25,6 +26,7 @@ class GubPdfService {
         private FiscalYearMapper $fiscalYearMapper,
         private IncomeMapper $incomeMapper,
         private ExpenseMapper $expenseMapper,
+        private ActiveCompanyService $activeCompanyService,
         private IConfig $config,
         private IUserSession $userSession,
     ) {}
@@ -33,10 +35,11 @@ class GubPdfService {
      * @return array{filename: string, content: string}
      */
     public function buildPdf(int $fiscalYearId): array {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         /** @var FiscalYear $year */
-        $year = $this->fiscalYearMapper->find($fiscalYearId);
-        $incomes = $this->incomeMapper->findByFiscalYearId($fiscalYearId);
-        $expenses = $this->expenseMapper->findByFiscalYearId($fiscalYearId);
+        $year = $this->fiscalYearMapper->findByIdAndCompanyId($fiscalYearId, $companyId);
+        $incomes = $this->incomeMapper->findByFiscalYearId($fiscalYearId, $companyId);
+        $expenses = $this->expenseMapper->findByFiscalYearId($fiscalYearId, $companyId);
 
         $html = $this->renderHtml($year, $incomes, $expenses);
         $content = $this->renderPdf($html);

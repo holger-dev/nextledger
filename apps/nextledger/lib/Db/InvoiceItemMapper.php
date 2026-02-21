@@ -16,7 +16,7 @@ class InvoiceItemMapper extends BaseMapper {
     /**
      * @return InvoiceItem[]
      */
-    public function findByInvoiceId(int $invoiceId): array {
+    public function findByInvoiceId(int $invoiceId, int $companyId): array {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -24,6 +24,15 @@ class InvoiceItemMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'invoice_id',
                     $qb->createNamedParameter($invoiceId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('created_at', 'ASC');

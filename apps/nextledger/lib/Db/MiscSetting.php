@@ -8,6 +8,7 @@ use OCP\AppFramework\Db\Entity;
 
 class MiscSetting extends Entity {
     public $id;
+    public $companyId;
     public $paymentTermsDays;
     public $bankName;
     public $iban;
@@ -15,6 +16,7 @@ class MiscSetting extends Entity {
     public $accountHolder;
 
     public function __construct() {
+        $this->addType('companyId', 'integer');
         $this->addType('paymentTermsDays', 'integer');
         $this->addType('bankName', 'string');
         $this->addType('iban', 'string');

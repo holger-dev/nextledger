@@ -8,6 +8,7 @@ use OCP\AppFramework\Db\Entity;
 
 class CaseEntity extends Entity {
     public $id;
+    public $companyId;
     public $customerId;
     public $name;
     public $description;
@@ -18,6 +19,7 @@ class CaseEntity extends Entity {
     public $updatedAt;
 
     public function __construct() {
+        $this->addType('companyId', 'integer');
         $this->addType('customerId', 'integer');
         $this->addType('name', 'string');
         $this->addType('description', 'text');

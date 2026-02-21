@@ -8,6 +8,7 @@ use OCP\AppFramework\Db\Entity;
 
 class Product extends Entity {
     public $id;
+    public $companyId;
     public $name;
     public $description;
     public $unitPriceCents;
@@ -15,6 +16,7 @@ class Product extends Entity {
     public $updatedAt;
 
     public function __construct() {
+        $this->addType('companyId', 'integer');
         $this->addType('name', 'string');
         $this->addType('description', 'text');
         $this->addType('unitPriceCents', 'integer');

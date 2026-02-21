@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace OCA\NextLedger\Controller;
 
+use OCA\NextLedger\Db\CaseEntityMapper;
+use OCA\NextLedger\Db\CustomerMapper;
+use OCA\NextLedger\Db\FiscalYearMapper;
 use OCA\NextLedger\Db\Income;
 use OCA\NextLedger\Db\IncomeMapper;
 use OCA\NextLedger\Db\Invoice;
 use OCA\NextLedger\Db\InvoiceMapper;
-use OCA\NextLedger\Db\FiscalYearMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
+use OCA\NextLedger\Service\DocumentStorageService;
 use OCA\NextLedger\Service\EmailSettingsService;
 use OCA\NextLedger\Service\InvoicePdfService;
 use OCA\NextLedger\Service\NumberGenerator;
@@ -33,6 +37,10 @@ class InvoicesController extends ApiController {
         private InvoicePdfService $invoicePdfService,
         private IMailer $mailer,
         private EmailSettingsService $emailSettingsService,
+        private CaseEntityMapper $caseMapper,
+        private CustomerMapper $customerMapper,
+        private ActiveCompanyService $activeCompanyService,
+        private DocumentStorageService $documentStorageService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -42,6 +50,8 @@ class InvoicesController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(?string $caseId = null, ?string $customerId = null): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+
         $caseFilter = null;
         if ($caseId !== null && $caseId !== '') {
             $caseFilter = (int)$caseId;
@@ -53,11 +63,11 @@ class InvoicesController extends ApiController {
         }
 
         if ($caseFilter !== null) {
-            $items = $this->invoiceMapper->findByCaseId($caseFilter);
+            $items = $this->invoiceMapper->findByCaseId($caseFilter, $companyId);
         } elseif ($customerFilter !== null) {
-            $items = $this->invoiceMapper->findByCustomerId($customerFilter);
+            $items = $this->invoiceMapper->findByCustomerId($customerFilter, $companyId);
         } else {
-            $items = $this->invoiceMapper->findAll();
+            $items = $this->invoiceMapper->findAllByCompanyId($companyId);
         }
 
         $data = array_map(fn(Invoice $invoice) => $this->entityToArray($invoice), $items);
@@ -71,10 +81,11 @@ class InvoicesController extends ApiController {
      * @NoCSRFRequired
      */
     public function show(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceId = (int)$id;
         try {
             /** @var Invoice $invoice */
-            $invoice = $this->invoiceMapper->find($invoiceId);
+            $invoice = $this->invoiceMapper->findByIdAndCompanyId($invoiceId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -106,7 +117,8 @@ class InvoicesController extends ApiController {
         ?int $taxRateBp = null,
         ?bool $isSmallBusiness = null,
     ): JSONResponse {
-        $activeYear = $this->fiscalYearMapper->findActive();
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $activeYear = $this->fiscalYearMapper->findActive($companyId);
         if (!$activeYear) {
             return new JSONResponse(
                 ['message' => 'Kein aktives Wirtschaftsjahr vorhanden.'],
@@ -116,8 +128,15 @@ class InvoicesController extends ApiController {
         if ($caseId === null) {
             return new JSONResponse(['message' => 'Vorgang erforderlich.'], Http::STATUS_BAD_REQUEST);
         }
+        if (!$this->caseExistsInCompany($caseId, $companyId)) {
+            return new JSONResponse(['message' => 'Vorgang nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+        if ($customerId !== null && !$this->customerExistsInCompany($customerId, $companyId)) {
+            return new JSONResponse(['message' => 'Kunde nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
 
         $invoice = new Invoice();
+        $invoice->setCompanyId($companyId);
         $invoice->setCaseId($caseId);
         $invoice->setCustomerId($customerId);
         $invoice->setNumber($number ?: $this->numberGenerator->nextInvoiceNumber());
@@ -140,7 +159,7 @@ class InvoicesController extends ApiController {
         $invoice->setUpdatedAt(time());
 
         $saved = $this->invoiceMapper->insert($invoice);
-        $this->syncIncome($saved);
+        $this->syncIncome($saved, $companyId);
 
         return new JSONResponse($this->entityToArray($saved));
     }
@@ -170,10 +189,11 @@ class InvoicesController extends ApiController {
         ?int $taxRateBp = null,
         ?bool $isSmallBusiness = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceId = (int)$id;
         try {
             /** @var Invoice $invoice */
-            $invoice = $this->invoiceMapper->find($invoiceId);
+            $invoice = $this->invoiceMapper->findByIdAndCompanyId($invoiceId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -181,7 +201,14 @@ class InvoicesController extends ApiController {
         if ($caseId === null) {
             return new JSONResponse(['message' => 'Vorgang erforderlich.'], Http::STATUS_BAD_REQUEST);
         }
+        if (!$this->caseExistsInCompany($caseId, $companyId)) {
+            return new JSONResponse(['message' => 'Vorgang nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+        if ($customerId !== null && !$this->customerExistsInCompany($customerId, $companyId)) {
+            return new JSONResponse(['message' => 'Kunde nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
 
+        $invoice->setCompanyId($companyId);
         $invoice->setCaseId($caseId);
         $invoice->setCustomerId($customerId);
         if ($number !== null && $number !== '') {
@@ -209,7 +236,7 @@ class InvoicesController extends ApiController {
         $invoice->setUpdatedAt(time());
 
         $saved = $this->invoiceMapper->update($invoice);
-        $this->syncIncome($saved);
+        $this->syncIncome($saved, $companyId);
 
         return new JSONResponse($this->entityToArray($saved));
     }
@@ -219,15 +246,16 @@ class InvoicesController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceId = (int)$id;
         try {
             /** @var Invoice $invoice */
-            $invoice = $this->invoiceMapper->find($invoiceId);
+            $invoice = $this->invoiceMapper->findByIdAndCompanyId($invoiceId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
-        $income = $this->incomeMapper->findByInvoiceId($invoiceId);
+        $income = $this->incomeMapper->findByInvoiceId($invoiceId, $companyId);
         if ($income) {
             $this->incomeMapper->delete($income);
         }
@@ -241,14 +269,23 @@ class InvoicesController extends ApiController {
      * @NoCSRFRequired
      */
     public function pdf(string $id): Response {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceId = (int)$id;
         try {
+            /** @var Invoice $invoice */
+            $invoice = $this->invoiceMapper->findByIdAndCompanyId($invoiceId, $companyId);
             $result = $this->invoicePdfService->buildPdf($invoiceId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
         } catch (\Throwable $e) {
             return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
+
+        $this->documentStorageService->storeGeneratedPdf(
+            (string)($invoice->getNumber() ?: ('invoice-' . $invoice->getId())),
+            $invoice->getIssueDate(),
+            $result['content']
+        );
 
         return new DataDownloadResponse(
             $result['content'],
@@ -262,10 +299,11 @@ class InvoicesController extends ApiController {
      * @NoCSRFRequired
      */
     public function sendEmail(string $id, ?array $to = null, ?string $subject = null, ?string $body = null): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceId = (int)$id;
         try {
             /** @var Invoice $invoice */
-            $invoice = $this->invoiceMapper->find($invoiceId);
+            $invoice = $this->invoiceMapper->findByIdAndCompanyId($invoiceId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -282,6 +320,11 @@ class InvoicesController extends ApiController {
 
         try {
             $result = $this->invoicePdfService->buildPdf($invoice->getId());
+            $this->documentStorageService->storeGeneratedPdf(
+                (string)($invoice->getNumber() ?: ('invoice-' . $invoice->getId())),
+                $invoice->getIssueDate(),
+                $result['content']
+            );
         } catch (\Throwable $e) {
             return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
@@ -295,20 +338,21 @@ class InvoicesController extends ApiController {
         return new JSONResponse(['status' => 'sent']);
     }
 
-    private function syncIncome(Invoice $invoice): void {
-        $income = $this->incomeMapper->findByInvoiceId($invoice->getId());
+    private function syncIncome(Invoice $invoice, int $companyId): void {
+        $income = $this->incomeMapper->findByInvoiceId($invoice->getId(), $companyId);
         $year = null;
         if ($invoice->getIssueDate()) {
-            $year = $this->fiscalYearMapper->findByDate($invoice->getIssueDate());
+            $year = $this->fiscalYearMapper->findByDate($invoice->getIssueDate(), $companyId);
         }
         if (!$year) {
-            $year = $this->fiscalYearMapper->findActive();
+            $year = $this->fiscalYearMapper->findActive($companyId);
         }
 
         $description = $invoice->getNumber() ? 'Rechnung ' . $invoice->getNumber() : 'Rechnung';
         $status = $invoice->getStatus() ?: 'open';
 
         if ($income) {
+            $income->setCompanyId($companyId);
             $income->setFiscalYearId($year?->getId());
             $income->setAmountCents($invoice->getTotalCents());
             $income->setStatus($status);
@@ -321,6 +365,7 @@ class InvoicesController extends ApiController {
         }
 
         $income = new Income();
+        $income->setCompanyId($companyId);
         $income->setFiscalYearId($year?->getId());
         $income->setInvoiceId($invoice->getId());
         $income->setAmountCents($invoice->getTotalCents());
@@ -331,6 +376,24 @@ class InvoicesController extends ApiController {
         $income->setCreatedAt(time());
         $income->setUpdatedAt(time());
         $this->incomeMapper->insert($income);
+    }
+
+    private function caseExistsInCompany(int $caseId, int $companyId): bool {
+        try {
+            $this->caseMapper->findByIdAndCompanyId($caseId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
+    }
+
+    private function customerExistsInCompany(int $customerId, int $companyId): bool {
+        try {
+            $this->customerMapper->findByIdAndCompanyId($customerId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
     }
 
     private function normalizeRecipients(mixed $value): array {

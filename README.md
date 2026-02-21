@@ -43,8 +43,10 @@ Kleinunternehmerregelung und Standard-USt.
 
 ## Highlights
 - **Nextcloud‑native UI** using Nextcloud Vue Components
-- **Customers, Products/DL, Cases, Elements** in a clean master/detail workflow
+- **Multi-Company support** with one active company context at a time
+- **Customers, Products/DL, Cases, Elements** scoped to the active company
 - **Offers & Invoices** with positions, tax logic, and PDF export
+- **Optional PDF auto-storage** to Nextcloud Files with overwrite or versioning
 - **Numbering** `YYYYMMDD-####` for offers and invoices
 - **Mail‑to workflow** for offers/invoices (auto‑download PDF + template mail)
 - **Fiscal Years** with **Einnahmen/Ausgaben** and **GÜB PDF** export
@@ -52,16 +54,26 @@ Kleinunternehmerregelung und Standard-USt.
 
 ## What You Can Do
 ### Core Workflow
-1. Create a **Customer**
-2. Open a **Case** for the customer
-3. Create **Offers** and **Invoices** from the case
-4. Export PDF and send via **mailto** template
-5. Track **Einnahmen/Ausgaben** in the fiscal year and export **GÜB**
+1. Select or create the active **Company** in settings
+2. Create a **Customer**
+3. Open a **Case** for the customer
+4. Create **Offers** and **Invoices** from the case
+5. Export PDF and send via **mailto** template
+6. Track **Einnahmen/Ausgaben** in the fiscal year and export **GÜB**
 
 ### Documents
 - **Offer / Invoice PDFs** follow a clean A4 layout
 - Tax block adapts to **USt** or **Kleinunternehmer**
 - Footer shows your closing text and (optional) bank info
+- Optional automatic filing to `Files/NextLedger/<Firma>/<Wirtschaftsjahr>`
+- Storage mode can be configured:
+  overwrite existing file, or create versioned files (`..._v1`, `..._v2`, ...)
+
+### Multi-Company
+- Manage multiple companies under **Settings → Firma**
+- Exactly one company is active at a time
+- Active company is shown in the left navigation at **Vorgänge**
+- Core data is company-scoped: customers, cases, offers, invoices, products, fiscal years, incomes, expenses
 
 ### Mail Templates
 Mail text supports placeholders like:

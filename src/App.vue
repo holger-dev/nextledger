@@ -1,7 +1,7 @@
 <template>
   <NcContent app-name="nextledger">
     <NcAppNavigation>
-      <NcAppNavigationItem :to="{ name: 'cases' }" name="Vorgänge" />
+      <NcAppNavigationItem :to="{ name: 'cases' }" :name="casesNavName" />
       <NcAppNavigationItem :to="{ name: 'invoices' }" name="Rechnungen" />
       <NcAppNavigationItem :to="{ name: 'offers' }" name="Angebote" />
       <NcAppNavigationSpacer />
@@ -15,6 +15,7 @@
         <NcAppNavigationItem :to="{ name: 'settings-texts' }" name="Texte" />
         <NcAppNavigationItem :to="{ name: 'settings-tax' }" name="Steuer" />
         <NcAppNavigationItem :to="{ name: 'settings-misc' }" name="Kontodaten" />
+        <NcAppNavigationItem :to="{ name: 'settings-documents' }" name="Dokumente" />
         <NcAppNavigationItem :to="{ name: 'settings-email' }" name="E-Mailverhalten" />
       </NcAppNavigationSettings>
 
@@ -39,6 +40,7 @@ import {
   NcAppNavigationSettings,
 } from '@nextcloud/vue'
 import NcAppNavigationSpacer from '@nextcloud/vue/dist/Components/NcAppNavigationSpacer.mjs'
+import { getCompanies } from './api/settings'
 
 export default {
   name: 'NextLedgerApp',
@@ -49,6 +51,38 @@ export default {
     NcAppNavigationItem,
     NcAppNavigationSpacer,
     NcAppNavigationSettings,
+  },
+  data() {
+    return {
+      activeCompanyName: '',
+    }
+  },
+  computed: {
+    casesNavName() {
+      return this.activeCompanyName
+        ? `Vorgänge · ${this.activeCompanyName}`
+        : 'Vorgänge'
+    },
+  },
+  async created() {
+    await this.loadCompanyContext()
+    window.addEventListener('nextledger-company-changed', this.loadCompanyContext)
+  },
+  beforeDestroy() {
+    window.removeEventListener('nextledger-company-changed', this.loadCompanyContext)
+  },
+  methods: {
+    async loadCompanyContext() {
+      try {
+        const data = await getCompanies()
+        const activeId = Number(data.activeCompanyId)
+        const companies = Array.isArray(data.companies) ? data.companies : []
+        const active = companies.find((entry) => Number(entry.id) === activeId)
+        this.activeCompanyName = active?.name ? String(active.name) : ''
+      } catch (e) {
+        this.activeCompanyName = ''
+      }
+    },
   },
 }
 </script>

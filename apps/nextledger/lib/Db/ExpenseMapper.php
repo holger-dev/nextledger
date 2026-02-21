@@ -16,7 +16,7 @@ class ExpenseMapper extends BaseMapper {
     /**
      * @return Expense[]
      */
-    public function findByFiscalYearId(int $fiscalYearId): array {
+    public function findByFiscalYearId(int $fiscalYearId, int $companyId): array {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -24,6 +24,15 @@ class ExpenseMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'fiscal_year_id',
                     $qb->createNamedParameter($fiscalYearId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('booked_at', 'DESC');

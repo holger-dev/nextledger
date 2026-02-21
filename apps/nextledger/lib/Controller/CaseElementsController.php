@@ -6,6 +6,8 @@ namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\CaseElement;
 use OCA\NextLedger\Db\CaseElementMapper;
+use OCA\NextLedger\Db\CaseEntityMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -18,6 +20,8 @@ class CaseElementsController extends ApiController {
         string $appName,
         IRequest $request,
         private CaseElementMapper $caseElementMapper,
+        private CaseEntityMapper $caseMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -27,8 +31,13 @@ class CaseElementsController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(string $caseId): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $caseKey = (int)$caseId;
-        $items = $this->caseElementMapper->findByCaseId($caseKey);
+        if (!$this->caseExistsInCompany($caseKey, $companyId)) {
+            return new JSONResponse(['message' => 'Vorgang nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $items = $this->caseElementMapper->findByCaseId($caseKey, $companyId);
         $data = array_map(
             fn(CaseElement $element) => $this->entityToArray($element),
             $items
@@ -47,8 +56,15 @@ class CaseElementsController extends ApiController {
         ?string $note = null,
         ?string $attachmentPath = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $caseKey = (int)$caseId;
+        if (!$this->caseExistsInCompany($caseKey, $companyId)) {
+            return new JSONResponse(['message' => 'Vorgang nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+
         $element = new CaseElement();
-        $element->setCaseId((int)$caseId);
+        $element->setCompanyId($companyId);
+        $element->setCaseId($caseKey);
         $element->setName($name);
         $element->setNote($note);
         $element->setAttachmentPath($attachmentPath);
@@ -69,10 +85,11 @@ class CaseElementsController extends ApiController {
         ?string $note = null,
         ?string $attachmentPath = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $elementId = (int)$id;
         try {
             /** @var CaseElement $element */
-            $element = $this->caseElementMapper->find($elementId);
+            $element = $this->caseElementMapper->findByIdAndCompanyId($elementId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Element nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -91,16 +108,26 @@ class CaseElementsController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $elementId = (int)$id;
         try {
             /** @var CaseElement $element */
-            $element = $this->caseElementMapper->find($elementId);
+            $element = $this->caseElementMapper->findByIdAndCompanyId($elementId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Element nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
         $this->caseElementMapper->delete($element);
         return new JSONResponse(['status' => 'ok']);
+    }
+
+    private function caseExistsInCompany(int $caseId, int $companyId): bool {
+        try {
+            $this->caseMapper->findByIdAndCompanyId($caseId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
     }
 
     private function entityToArray(object $entity): array {

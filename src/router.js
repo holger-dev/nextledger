@@ -17,6 +17,7 @@ import SettingsCompany from './views/SettingsCompany.vue'
 import SettingsTexts from './views/SettingsTexts.vue'
 import SettingsTax from './views/SettingsTax.vue'
 import SettingsMisc from './views/SettingsMisc.vue'
+import SettingsDocuments from './views/SettingsDocuments.vue'
 import SettingsEmailBehavior from './views/SettingsEmailBehavior.vue'
 import SettingsHelp from './views/SettingsHelp.vue'
 
@@ -48,6 +49,7 @@ export default new Router({
     { path: '/settings/texts', name: 'settings-texts', component: SettingsTexts },
     { path: '/settings/tax', name: 'settings-tax', component: SettingsTax },
     { path: '/settings/misc', name: 'settings-misc', component: SettingsMisc },
+    { path: '/settings/documents', name: 'settings-documents', component: SettingsDocuments },
     { path: '/settings/email', name: 'settings-email', component: SettingsEmailBehavior },
     { path: '/settings/help', name: 'settings-help', component: SettingsHelp },
     { path: '*', redirect: '/' },

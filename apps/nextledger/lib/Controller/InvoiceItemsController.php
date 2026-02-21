@@ -6,6 +6,8 @@ namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\InvoiceItem;
 use OCA\NextLedger\Db\InvoiceItemMapper;
+use OCA\NextLedger\Db\InvoiceMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -18,6 +20,8 @@ class InvoiceItemsController extends ApiController {
         string $appName,
         IRequest $request,
         private InvoiceItemMapper $invoiceItemMapper,
+        private InvoiceMapper $invoiceMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -27,8 +31,13 @@ class InvoiceItemsController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(string $invoiceId): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceKey = (int)$invoiceId;
-        $items = $this->invoiceItemMapper->findByInvoiceId($invoiceKey);
+        if (!$this->invoiceExistsInCompany($invoiceKey, $companyId)) {
+            return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $items = $this->invoiceItemMapper->findByInvoiceId($invoiceKey, $companyId);
         $data = array_map(
             fn(InvoiceItem $item) => $this->entityToArray($item),
             $items
@@ -51,8 +60,15 @@ class InvoiceItemsController extends ApiController {
         ?int $unitPriceCents = null,
         ?int $totalCents = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $invoiceKey = (int)$invoiceId;
+        if (!$this->invoiceExistsInCompany($invoiceKey, $companyId)) {
+            return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+
         $item = new InvoiceItem();
-        $item->setInvoiceId((int)$invoiceId);
+        $item->setCompanyId($companyId);
+        $item->setInvoiceId($invoiceKey);
         $item->setProductId($productId);
         $item->setPositionType($positionType);
         $item->setName($name);
@@ -81,10 +97,11 @@ class InvoiceItemsController extends ApiController {
         ?int $unitPriceCents = null,
         ?int $totalCents = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $itemId = (int)$id;
         try {
             /** @var InvoiceItem $item */
-            $item = $this->invoiceItemMapper->find($itemId);
+            $item = $this->invoiceItemMapper->findByIdAndCompanyId($itemId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Position nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -107,16 +124,26 @@ class InvoiceItemsController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $itemId = (int)$id;
         try {
             /** @var InvoiceItem $item */
-            $item = $this->invoiceItemMapper->find($itemId);
+            $item = $this->invoiceItemMapper->findByIdAndCompanyId($itemId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Position nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
         $this->invoiceItemMapper->delete($item);
         return new JSONResponse(['status' => 'ok']);
+    }
+
+    private function invoiceExistsInCompany(int $invoiceId, int $companyId): bool {
+        try {
+            $this->invoiceMapper->findByIdAndCompanyId($invoiceId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
     }
 
     private function entityToArray(object $entity): array {

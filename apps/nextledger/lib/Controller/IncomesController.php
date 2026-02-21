@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace OCA\NextLedger\Controller;
 
+use OCA\NextLedger\Db\FiscalYearMapper;
 use OCA\NextLedger\Db\Income;
 use OCA\NextLedger\Db\IncomeMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -18,6 +20,8 @@ class IncomesController extends ApiController {
         string $appName,
         IRequest $request,
         private IncomeMapper $incomeMapper,
+        private FiscalYearMapper $fiscalYearMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -27,8 +31,13 @@ class IncomesController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(string $fiscalYearId): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $yearId = (int)$fiscalYearId;
-        $items = $this->incomeMapper->findByFiscalYearId($yearId);
+        if (!$this->fiscalYearExistsInCompany($yearId, $companyId)) {
+            return new JSONResponse(['message' => 'Wirtschaftsjahr nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $items = $this->incomeMapper->findByFiscalYearId($yearId, $companyId);
         $data = array_map(fn(Income $income) => $this->entityToArray($income), $items);
 
         return new JSONResponse($data);
@@ -46,8 +55,15 @@ class IncomesController extends ApiController {
         ?int $bookedAt = null,
         ?string $status = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $yearId = (int)$fiscalYearId;
+        if (!$this->fiscalYearExistsInCompany($yearId, $companyId)) {
+            return new JSONResponse(['message' => 'Wirtschaftsjahr nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
         $income = new Income();
-        $income->setFiscalYearId((int)$fiscalYearId);
+        $income->setCompanyId($companyId);
+        $income->setFiscalYearId($yearId);
         $income->setInvoiceId(null);
         $income->setName($name);
         $income->setDescription($description);
@@ -73,10 +89,11 @@ class IncomesController extends ApiController {
         ?int $bookedAt = null,
         ?string $status = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $incomeId = (int)$id;
         try {
             /** @var Income $income */
-            $income = $this->incomeMapper->find($incomeId);
+            $income = $this->incomeMapper->findByIdAndCompanyId($incomeId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Einnahme nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -101,10 +118,11 @@ class IncomesController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $incomeId = (int)$id;
         try {
             /** @var Income $income */
-            $income = $this->incomeMapper->find($incomeId);
+            $income = $this->incomeMapper->findByIdAndCompanyId($incomeId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Einnahme nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -115,6 +133,15 @@ class IncomesController extends ApiController {
 
         $this->incomeMapper->delete($income);
         return new JSONResponse(['status' => 'ok']);
+    }
+
+    private function fiscalYearExistsInCompany(int $yearId, int $companyId): bool {
+        try {
+            $this->fiscalYearMapper->findByIdAndCompanyId($yearId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
     }
 
     private function entityToArray(object $entity): array {

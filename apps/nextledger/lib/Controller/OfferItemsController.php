@@ -6,6 +6,8 @@ namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\OfferItem;
 use OCA\NextLedger\Db\OfferItemMapper;
+use OCA\NextLedger\Db\OfferMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -18,6 +20,8 @@ class OfferItemsController extends ApiController {
         string $appName,
         IRequest $request,
         private OfferItemMapper $offerItemMapper,
+        private OfferMapper $offerMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -27,8 +31,13 @@ class OfferItemsController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(string $offerId): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $offerKey = (int)$offerId;
-        $items = $this->offerItemMapper->findByOfferId($offerKey);
+        if (!$this->offerExistsInCompany($offerKey, $companyId)) {
+            return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        }
+
+        $items = $this->offerItemMapper->findByOfferId($offerKey, $companyId);
         $data = array_map(
             fn(OfferItem $item) => $this->entityToArray($item),
             $items
@@ -51,8 +60,15 @@ class OfferItemsController extends ApiController {
         ?int $unitPriceCents = null,
         ?int $totalCents = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $offerKey = (int)$offerId;
+        if (!$this->offerExistsInCompany($offerKey, $companyId)) {
+            return new JSONResponse(['message' => 'Angebot nicht gefunden.'], Http::STATUS_BAD_REQUEST);
+        }
+
         $item = new OfferItem();
-        $item->setOfferId((int)$offerId);
+        $item->setCompanyId($companyId);
+        $item->setOfferId($offerKey);
         $item->setProductId($productId);
         $item->setPositionType($positionType);
         $item->setName($name);
@@ -81,10 +97,11 @@ class OfferItemsController extends ApiController {
         ?int $unitPriceCents = null,
         ?int $totalCents = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $itemId = (int)$id;
         try {
             /** @var OfferItem $item */
-            $item = $this->offerItemMapper->find($itemId);
+            $item = $this->offerItemMapper->findByIdAndCompanyId($itemId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Position nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
@@ -107,16 +124,26 @@ class OfferItemsController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $itemId = (int)$id;
         try {
             /** @var OfferItem $item */
-            $item = $this->offerItemMapper->find($itemId);
+            $item = $this->offerItemMapper->findByIdAndCompanyId($itemId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Position nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
         $this->offerItemMapper->delete($item);
         return new JSONResponse(['status' => 'ok']);
+    }
+
+    private function offerExistsInCompany(int $offerId, int $companyId): bool {
+        try {
+            $this->offerMapper->findByIdAndCompanyId($offerId, $companyId);
+            return true;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return false;
+        }
     }
 
     private function entityToArray(object $entity): array {

@@ -14,6 +14,7 @@ class NumberGenerator {
     public function __construct(
         private IConfig $config,
         private ITimeFactory $timeFactory,
+        private ActiveCompanyService $activeCompanyService,
     ) {}
 
     public function nextInvoiceNumber(?DateTimeInterface $date = null): string {
@@ -27,7 +28,8 @@ class NumberGenerator {
     private function nextNumber(string $type, ?DateTimeInterface $date = null): string {
         $date = $date ?? $this->timeFactory->getDateTime('now');
         $dayKey = $date->format('Ymd');
-        $configKey = $type . '_' . $dayKey;
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $configKey = $type . '_' . $companyId . '_' . $dayKey;
         $current = (int) $this->config->getAppValue(self::APP_ID, $configKey, '0');
         $next = $current + 1;
         $this->config->setAppValue(self::APP_ID, $configKey, (string) $next);

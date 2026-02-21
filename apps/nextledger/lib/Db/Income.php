@@ -8,6 +8,7 @@ use OCP\AppFramework\Db\Entity;
 
 class Income extends Entity {
     public $id;
+    public $companyId;
     public $fiscalYearId;
     public $invoiceId;
     public $name;
@@ -19,6 +20,7 @@ class Income extends Entity {
     public $updatedAt;
 
     public function __construct() {
+        $this->addType('companyId', 'integer');
         $this->addType('fiscalYearId', 'integer');
         $this->addType('invoiceId', 'integer');
         $this->addType('name', 'string');

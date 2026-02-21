@@ -6,6 +6,7 @@ namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\FiscalYear;
 use OCA\NextLedger\Db\FiscalYearMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -18,6 +19,7 @@ class FiscalYearsController extends ApiController {
         string $appName,
         IRequest $request,
         private FiscalYearMapper $fiscalYearMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -27,7 +29,8 @@ class FiscalYearsController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(): JSONResponse {
-        $items = $this->fiscalYearMapper->findAll();
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $items = $this->fiscalYearMapper->findAllByCompanyId($companyId);
         $data = array_map(fn(FiscalYear $year) => $this->entityToArray($year), $items);
 
         usort($data, static function (array $a, array $b): int {
@@ -52,7 +55,9 @@ class FiscalYearsController extends ApiController {
         ?int $dateEnd = null,
         ?bool $isActive = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $year = new FiscalYear();
+        $year->setCompanyId($companyId);
         $year->setName($name);
         $year->setDateStart($dateStart);
         $year->setDateEnd($dateEnd);
@@ -62,7 +67,7 @@ class FiscalYearsController extends ApiController {
 
         $saved = $this->fiscalYearMapper->insert($year);
         if ($saved->getIsActive()) {
-            $this->fiscalYearMapper->deactivateAllExcept($saved->getId());
+            $this->fiscalYearMapper->deactivateAllExcept($saved->getId(), $companyId);
         }
         return new JSONResponse($this->entityToArray($saved));
     }
@@ -78,14 +83,16 @@ class FiscalYearsController extends ApiController {
         ?int $dateEnd = null,
         ?bool $isActive = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $yearId = (int)$id;
         try {
             /** @var FiscalYear $year */
-            $year = $this->fiscalYearMapper->find($yearId);
+            $year = $this->fiscalYearMapper->findByIdAndCompanyId($yearId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Wirtschaftsjahr nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
+        $year->setCompanyId($companyId);
         $year->setName($name);
         $year->setDateStart($dateStart);
         $year->setDateEnd($dateEnd);
@@ -96,7 +103,7 @@ class FiscalYearsController extends ApiController {
 
         $saved = $this->fiscalYearMapper->update($year);
         if ($saved->getIsActive()) {
-            $this->fiscalYearMapper->deactivateAllExcept($saved->getId());
+            $this->fiscalYearMapper->deactivateAllExcept($saved->getId(), $companyId);
         }
         return new JSONResponse($this->entityToArray($saved));
     }
@@ -106,10 +113,11 @@ class FiscalYearsController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $yearId = (int)$id;
         try {
             /** @var FiscalYear $year */
-            $year = $this->fiscalYearMapper->find($yearId);
+            $year = $this->fiscalYearMapper->findByIdAndCompanyId($yearId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Wirtschaftsjahr nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }

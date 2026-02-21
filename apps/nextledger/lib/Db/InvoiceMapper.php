@@ -16,7 +16,7 @@ class InvoiceMapper extends BaseMapper {
     /**
      * @return Invoice[]
      */
-    public function findByCaseId(int $caseId): array {
+    public function findByCaseId(int $caseId, int $companyId): array {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -24,6 +24,15 @@ class InvoiceMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'case_id',
                     $qb->createNamedParameter($caseId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('issue_date', 'ASC');
@@ -34,7 +43,7 @@ class InvoiceMapper extends BaseMapper {
     /**
      * @return Invoice[]
      */
-    public function findByCustomerId(int $customerId): array {
+    public function findByCustomerId(int $customerId, int $companyId): array {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -42,6 +51,15 @@ class InvoiceMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'customer_id',
                     $qb->createNamedParameter($customerId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('issue_date', 'DESC');
@@ -52,7 +70,7 @@ class InvoiceMapper extends BaseMapper {
     /**
      * @return Invoice[]
      */
-    public function findByRelatedOfferId(int $offerId): array {
+    public function findByRelatedOfferId(int $offerId, int $companyId): array {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
@@ -60,6 +78,15 @@ class InvoiceMapper extends BaseMapper {
                 $qb->expr()->eq(
                     'related_offer_id',
                     $qb->createNamedParameter($offerId, IQueryBuilder::PARAM_INT)
+                ),
+            )
+            ->andWhere(
+                $qb->expr()->orX(
+                    $qb->expr()->eq(
+                        'company_id',
+                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
+                    ),
+                    $qb->expr()->isNull('company_id')
                 )
             )
             ->orderBy('issue_date', 'ASC');

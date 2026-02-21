@@ -22,6 +22,7 @@ use OCA\NextLedger\Db\TaxSetting;
 use OCA\NextLedger\Db\TaxSettingMapper;
 use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\IConfig;
@@ -40,6 +41,7 @@ class InvoicePdfService {
         private TextsMapper $textsMapper,
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
+        private ActiveCompanyService $activeCompanyService,
         private IConfig $config,
         private IUserSession $userSession,
     ) {}
@@ -50,13 +52,14 @@ class InvoicePdfService {
     public function buildPdf(int $invoiceId): array {
         /** @var Invoice $invoice */
         $invoice = $this->invoiceMapper->find($invoiceId);
-        $items = $this->invoiceItemMapper->findByInvoiceId($invoiceId);
-        $customer = $this->loadCustomer($invoice->getCustomerId());
-        $company = $this->loadCompany();
-        $texts = $this->loadTexts();
-        $tax = $this->loadTax();
-        $misc = $this->loadMisc();
-        $offer = $this->loadOffer($invoice->getRelatedOfferId());
+        $companyId = (int)($invoice->getCompanyId() ?: $this->activeCompanyService->getActiveCompanyId());
+        $items = $this->invoiceItemMapper->findByInvoiceId($invoiceId, $companyId);
+        $customer = $this->loadCustomer($invoice->getCustomerId(), $companyId);
+        $company = $this->loadCompany($companyId);
+        $texts = $this->loadTexts($companyId);
+        $tax = $this->loadTax($companyId);
+        $misc = $this->loadMisc($companyId);
+        $offer = $this->loadOffer($invoice->getRelatedOfferId(), $companyId);
 
         $html = $this->renderHtml($invoice, $items, $customer, $company, $texts, $tax, $misc, $offer);
         $content = $this->renderPdf($html);
@@ -297,49 +300,54 @@ class InvoicePdfService {
         return number_format($cents / 100, 2, ',', '.') . ' €';
     }
 
-    private function loadCustomer(?int $customerId): ?Customer {
+    private function loadCustomer(?int $customerId, int $companyId): ?Customer {
         if (!$customerId) {
             return null;
         }
         try {
             /** @var Customer $customer */
-            $customer = $this->customerMapper->find($customerId);
+            $customer = $this->customerMapper->findByIdAndCompanyId($customerId, $companyId);
             return $customer;
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return null;
         }
     }
 
-    private function loadCompany(): ?Company {
-        $items = $this->companyMapper->findAll(1, 0);
-        return $items[0] ?? null;
+    private function loadCompany(int $companyId): ?Company {
+        try {
+            /** @var Company $company */
+            $company = $this->companyMapper->find($companyId);
+            return $company;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return null;
+        }
     }
 
-    private function loadOffer(?int $offerId): ?Offer {
+    private function loadOffer(?int $offerId, int $companyId): ?Offer {
         if (!$offerId) {
             return null;
         }
         try {
             /** @var Offer $offer */
-            $offer = $this->offerMapper->find($offerId);
+            $offer = $this->offerMapper->findByIdAndCompanyId($offerId, $companyId);
             return $offer;
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return null;
         }
     }
 
-    private function loadTexts(): ?Texts {
-        $items = $this->textsMapper->findAll(1, 0);
+    private function loadTexts(int $companyId): ?Texts {
+        $items = $this->textsMapper->findAllByCompanyId($companyId, 1, 0);
         return $items[0] ?? null;
     }
 
-    private function loadTax(): ?TaxSetting {
-        $items = $this->taxSettingMapper->findAll(1, 0);
+    private function loadTax(int $companyId): ?TaxSetting {
+        $items = $this->taxSettingMapper->findAllByCompanyId($companyId, 1, 0);
         return $items[0] ?? null;
     }
 
-    private function loadMisc(): ?MiscSetting {
-        $items = $this->miscSettingMapper->findAll(1, 0);
+    private function loadMisc(int $companyId): ?MiscSetting {
+        $items = $this->miscSettingMapper->findAllByCompanyId($companyId, 1, 0);
         return $items[0] ?? null;
     }
 

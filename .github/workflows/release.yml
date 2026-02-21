@@ -84,6 +84,23 @@ jobs:
           KEY=~/.nextcloud/certificates/${{ env.APP_NAME }}.key
           CRT=~/.nextcloud/certificates/${{ env.APP_NAME }}.crt
 
+          if [ ! -s "$KEY" ]; then
+            echo "Missing or empty secret: APP_PRIVATE_KEY"
+            exit 1
+          fi
+          if [ ! -s "$CRT" ]; then
+            echo "Missing or empty secret: APP_PUBLIC_CRT"
+            exit 1
+          fi
+          if ! grep -q "BEGIN .*PRIVATE KEY" "$KEY"; then
+            echo "APP_PRIVATE_KEY does not look like a PEM private key."
+            exit 1
+          fi
+          if ! grep -q "BEGIN CERTIFICATE" "$CRT"; then
+            echo "APP_PUBLIC_CRT does not look like a PEM certificate."
+            exit 1
+          fi
+
           # Parse checks: fail early with clear error if secrets are malformed.
           openssl pkey -in "$KEY" -noout >/dev/null
           openssl x509 -in "$CRT" -noout >/dev/null

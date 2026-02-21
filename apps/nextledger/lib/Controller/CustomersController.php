@@ -6,6 +6,7 @@ namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\Customer;
 use OCA\NextLedger\Db\CustomerMapper;
+use OCA\NextLedger\Service\ActiveCompanyService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -18,6 +19,7 @@ class CustomersController extends ApiController {
         string $appName,
         IRequest $request,
         private CustomerMapper $customerMapper,
+        private ActiveCompanyService $activeCompanyService,
     ) {
         parent::__construct($appName, $request);
     }
@@ -27,7 +29,8 @@ class CustomersController extends ApiController {
      * @NoCSRFRequired
      */
     public function list(): JSONResponse {
-        $items = $this->customerMapper->findAll();
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $items = $this->customerMapper->findAllByCompanyId($companyId);
         $data = array_map(fn(Customer $customer) => $this->entityToArray($customer), $items);
 
         usort($data, static fn(array $a, array $b) => strcasecmp($a['company'] ?? '', $b['company'] ?? ''));
@@ -51,7 +54,9 @@ class CustomersController extends ApiController {
         ?bool $sendInvoiceToBillingEmail = null,
         ?bool $sendInvoiceToContactEmail = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $customer = new Customer();
+        $customer->setCompanyId($companyId);
         $customer->setCompany($company);
         $customer->setContactName($contactName);
         $customer->setStreet($street);
@@ -86,14 +91,16 @@ class CustomersController extends ApiController {
         ?bool $sendInvoiceToBillingEmail = null,
         ?bool $sendInvoiceToContactEmail = null,
     ): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $customerId = (int)$id;
         try {
             /** @var Customer $customer */
-            $customer = $this->customerMapper->find($customerId);
+            $customer = $this->customerMapper->findByIdAndCompanyId($customerId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Kunde nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
+        $customer->setCompanyId($companyId);
         $customer->setCompany($company);
         $customer->setContactName($contactName);
         $customer->setStreet($street);
@@ -115,10 +122,11 @@ class CustomersController extends ApiController {
      * @NoCSRFRequired
      */
     public function destroy(string $id): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
         $customerId = (int)$id;
         try {
             /** @var Customer $customer */
-            $customer = $this->customerMapper->find($customerId);
+            $customer = $this->customerMapper->findByIdAndCompanyId($customerId, $companyId);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Kunde nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }

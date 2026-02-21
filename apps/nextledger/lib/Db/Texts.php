@@ -8,6 +8,7 @@ use OCP\AppFramework\Db\Entity;
 
 class Texts extends Entity {
     public $id;
+    public $companyId;
     public $invoiceGreeting;
     public $offerGreeting;
     public $footerText;
@@ -19,6 +20,7 @@ class Texts extends Entity {
     public $invoiceEmailBody;
 
     public function __construct() {
+        $this->addType('companyId', 'integer');
         $this->addType('invoiceGreeting', 'text');
         $this->addType('offerGreeting', 'text');
         $this->addType('footerText', 'text');
