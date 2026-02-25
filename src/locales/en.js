@@ -83,7 +83,7 @@ export default {
     settingsDocuments: {
       title: 'Documents',
       autoStore: 'Automatically store invoice and offer PDFs in files',
-      versioning: 'Enable versioning (e.g. RE20260221-0001_v1, _v2, _v3)',
+      versioning: 'Enable versioning (invoices: one folder per invoice number, latest PDF without suffix, older as _v1, _v2 ...)',
       pathHint: 'Storage path: Files / NextLedger / Company / Fiscal year',
       save: 'Save',
       saving: 'Saving…',

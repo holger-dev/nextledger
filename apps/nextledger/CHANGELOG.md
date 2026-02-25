@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.5.1
+- Fix auto-stored PDF files in Nextcloud Files so generated invoice/offer PDFs open correctly
+- Improve invoice PDF versioning: one folder per invoice number, latest file without suffix, older files as `_v1`, `_v2`, ...
+
 ## 1.5.0
 - Add language-file based DE/EN support with centralized i18n runtime translation
 - Improve email behavior UX with explicit sender logic and optional sender/reply-to override switch

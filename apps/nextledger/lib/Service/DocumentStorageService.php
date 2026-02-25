@@ -8,6 +8,7 @@ use OCA\NextLedger\Db\DocumentSetting;
 use OCA\NextLedger\Db\DocumentSettingMapper;
 use OCA\NextLedger\Db\FiscalYear;
 use OCA\NextLedger\Db\FiscalYearMapper;
+use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\IUserSession;
@@ -24,7 +25,8 @@ class DocumentStorageService {
     public function storeGeneratedPdf(
         string $documentNumber,
         ?int $documentDateTs,
-        string $content
+        string $content,
+        string $documentType = 'document',
     ): ?string {
         $settings = $this->getSettings();
         if (empty($settings['autoStorePdfs'])) {
@@ -50,23 +52,80 @@ class DocumentStorageService {
         $folder = $this->ensureFolder($this->rootFolder->getUserFolder($user->getUID()), $relativeFolder);
 
         $baseName = $this->sanitizeFileName($documentNumber);
+        $documentType = strtolower(trim($documentType));
+        $useInvoiceFolderVersioning = !empty($settings['keepPdfVersions']) && $documentType === 'invoice';
+
+        if ($useInvoiceFolderVersioning) {
+            $folder = $this->ensureFolder($folder, $baseName);
+            $relativeFolder .= '/' . $baseName;
+            $latestFileName = sprintf('%s.pdf', $baseName);
+
+            if ($folder->nodeExists($latestFileName)) {
+                $currentNode = $folder->get($latestFileName);
+                if ($currentNode instanceof File) {
+                    $versionName = $this->nextVersionedName($folder, $baseName);
+                    $this->writeFileContent($folder, $versionName, $currentNode->getContent());
+                }
+                $currentNode->delete();
+            }
+
+            $this->writeFileContent($folder, $latestFileName, $content);
+            return $relativeFolder . '/' . $latestFileName;
+        }
+
         $targetName = empty($settings['keepPdfVersions'])
             ? sprintf('%s.pdf', $baseName)
             : $this->nextVersionedName($folder, $baseName);
 
+        $this->writeFileContent($folder, $targetName, $content);
+        return $relativeFolder . '/' . $targetName;
+    }
+
+    private function writeFileContent(Folder $folder, string $targetName, string $content): void {
         if ($folder->nodeExists($targetName)) {
-            $file = $folder->get($targetName);
-            if (method_exists($file, 'putContent')) {
-                $file->putContent($content);
+            $node = $folder->get($targetName);
+            if ($node instanceof Folder) {
+                $node->delete();
+                $file = $folder->newFile($targetName);
             } else {
-                $file->delete();
-                $folder->newFile($targetName, $content);
+                $file = $node;
             }
         } else {
-            $folder->newFile($targetName, $content);
+            $file = $folder->newFile($targetName);
         }
 
-        return $relativeFolder . '/' . $targetName;
+        if ($file instanceof File) {
+            $stream = $file->fopen('wb');
+            if (is_resource($stream)) {
+                $offset = 0;
+                $length = strlen($content);
+                $ok = true;
+                while ($offset < $length) {
+                    $written = fwrite($stream, substr($content, $offset));
+                    if ($written === false || $written === 0) {
+                        $ok = false;
+                        break;
+                    }
+                    $offset += $written;
+                }
+                fclose($stream);
+                if ($ok && $offset === $length) {
+                    return;
+                }
+            }
+            $file->putContent($content);
+            return;
+        }
+
+        if (method_exists($file, 'putContent')) {
+            $file->putContent($content);
+            return;
+        }
+
+        if (method_exists($file, 'delete')) {
+            $file->delete();
+        }
+        $folder->newFile($targetName, $content);
     }
 
     private function resolveFiscalYear(int $companyId, ?int $documentDateTs): ?FiscalYear {

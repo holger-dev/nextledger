@@ -83,7 +83,7 @@ export default {
     settingsDocuments: {
       title: 'Dokumente',
       autoStore: 'Rechnungs- und Angebots-PDFs automatisch in Dateien speichern',
-      versioning: 'Versionierung aktivieren (z.B. RE20260221-0001_v1, _v2, _v3)',
+      versioning: 'Versionierung aktivieren (Rechnungen: Ordner je Rechnungsnummer, aktuelle PDF ohne Suffix, alte als _v1, _v2 …)',
       pathHint: 'Ablagepfad: Dateien / NextLedger / Firma / Wirtschaftsjahr',
       save: 'Speichern',
       saving: 'Speichere…',

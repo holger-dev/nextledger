@@ -289,7 +289,8 @@ class InvoicesController extends ApiController {
         $this->documentStorageService->storeGeneratedPdf(
             (string)($invoice->getNumber() ?: ('invoice-' . $invoice->getId())),
             $invoice->getIssueDate(),
-            $result['content']
+            $result['content'],
+            'invoice'
         );
 
         return new DataDownloadResponse(
@@ -328,7 +329,8 @@ class InvoicesController extends ApiController {
             $this->documentStorageService->storeGeneratedPdf(
                 (string)($invoice->getNumber() ?: ('invoice-' . $invoice->getId())),
                 $invoice->getIssueDate(),
-                $result['content']
+                $result['content'],
+                'invoice'
             );
         } catch (\Throwable $e) {
             return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);

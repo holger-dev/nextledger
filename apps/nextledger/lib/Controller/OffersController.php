@@ -251,7 +251,8 @@ class OffersController extends ApiController {
         $this->documentStorageService->storeGeneratedPdf(
             (string)($offer->getNumber() ?: ('offer-' . $offer->getId())),
             $offer->getIssueDate(),
-            $result['content']
+            $result['content'],
+            'offer'
         );
 
         return new DataDownloadResponse(
@@ -290,7 +291,8 @@ class OffersController extends ApiController {
             $this->documentStorageService->storeGeneratedPdf(
                 (string)($offer->getNumber() ?: ('offer-' . $offer->getId())),
                 $offer->getIssueDate(),
-                $result['content']
+                $result['content'],
+                'offer'
             );
         } catch (\Throwable $e) {
             return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
