@@ -1,6 +1,6 @@
 <template>
   <section class="settings">
-    <h1>Steuer</h1>
+    <h1>{{ t('title') }}</h1>
 
     <NcLoadingIcon v-if="loading" />
 
@@ -10,30 +10,30 @@
         :checked="form.isSmallBusiness"
         @update:checked="form.isSmallBusiness = $event"
       >
-        Kleinunternehmerregelung anwenden
+        {{ t('smallBusinessSwitch') }}
       </NcCheckboxRadioSwitch>
 
       <NcTextField
-        label="Standard-USt-Satz (%) *"
+        :label="t('vatRate')"
         type="text"
-        placeholder="z. B. 19"
+        :placeholder="t('vatRatePlaceholder')"
         :disabled="form.isSmallBusiness"
         :value.sync="form.vatRatePercent"
       />
       <p v-if="fieldErrors.vatRatePercent" class="field-error">{{ fieldErrors.vatRatePercent }}</p>
 
       <NcTextArea
-        label="Hinweistext Kleinunternehmer"
+        :label="t('smallBusinessNote')"
         :disabled="!form.isSmallBusiness"
         :value.sync="form.smallBusinessNote"
       />
 
       <div class="actions">
         <NcButton type="primary" :disabled="saving" @click="save">
-          Speichern
+          {{ t('save') }}
         </NcButton>
-        <span v-if="saving" class="hint">Speichere…</span>
-        <span v-if="saved" class="success">Gespeichert</span>
+        <span v-if="saving" class="hint">{{ t('saving') }}</span>
+        <span v-if="saved" class="success">{{ t('saved') }}</span>
         <span v-if="error" class="error">{{ error }}</span>
       </div>
     </div>
@@ -64,7 +64,7 @@ export default {
       form: {
         vatRatePercent: '19',
         isSmallBusiness: false,
-        smallBusinessNote: 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.',
+        smallBusinessNote: '',
       },
       fieldErrors: {},
     }
@@ -73,6 +73,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`settingsTax.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -96,9 +99,9 @@ export default {
           return Boolean(value)
         }
         this.form.isSmallBusiness = parseBool(data.isSmallBusiness)
-        this.form.smallBusinessNote = data.smallBusinessNote || this.form.smallBusinessNote
+        this.form.smallBusinessNote = data.smallBusinessNote || this.t('smallBusinessNoteDefault')
       } catch (e) {
-        this.error = 'Daten konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -112,7 +115,7 @@ export default {
         if (!this.form.isSmallBusiness) {
           const rate = Number(this.form.vatRatePercent)
           if (Number.isNaN(rate) || rate < 0) {
-            this.fieldErrors = { vatRatePercent: 'Bitte einen gültigen Steuersatz angeben.' }
+            this.fieldErrors = { vatRatePercent: this.t('vatRateError') }
             this.saving = false
             return
           }
@@ -147,7 +150,7 @@ export default {
           this.saved = false
         }, 2000)
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }

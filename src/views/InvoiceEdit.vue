@@ -2,10 +2,10 @@
   <section class="invoice-edit">
     <div class="header">
       <div>
-        <h1>Rechnung bearbeiten</h1>
-        <p class="subline">Ändere Rechnung und Positionen.</p>
+        <h1>{{ t('titleEdit') }}</h1>
+        <p class="subline">{{ t('sublineEdit') }}</p>
       </div>
-      <NcButton type="secondary" @click="goBack">Zur Übersicht</NcButton>
+      <NcButton type="secondary" @click="goBack">{{ t('backToOverview') }}</NcButton>
     </div>
 
     <NcLoadingIcon v-if="loading" />
@@ -13,8 +13,8 @@
     <div v-else class="content">
       <div class="section-header">
         <button class="toggle" type="button" @click="toggleGeneral">
-          <span>Allgemeine Einstellungen</span>
-          <span class="toggle__state">{{ showGeneral ? 'Ausblenden' : 'Einblenden' }}</span>
+          <span>{{ t('generalSettings') }}</span>
+          <span class="toggle__state">{{ showGeneral ? t('hide') : t('show') }}</span>
         </button>
       </div>
 
@@ -28,17 +28,17 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Rechnungstyp"
+            :input-label="t('invoiceType')"
             :label-outside="true"
-            placeholder="Rechnungstyp"
+            :placeholder="t('invoiceType')"
           />
           <p class="field-hint">
-            Standard, Abschlags- oder Schlussrechnung. Abschläge brauchen einen Leistungszeitraum.
+            {{ t('invoiceTypeHint') }}
           </p>
         </div>
         <div class="form-group">
           <NcTextField
-            label="Rechnungsnummer"
+            :label="t('invoiceNumber')"
             :value.sync="form.number"
             :disabled="true"
           />
@@ -51,9 +51,9 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Kunde *"
+            :input-label="t('customerRequired')"
             :label-outside="true"
-            placeholder="Bitte auswählen"
+            :placeholder="t('selectPlease')"
           />
           <p v-if="fieldErrors.customerId" class="field-error">{{ fieldErrors.customerId }}</p>
         </div>
@@ -65,15 +65,15 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Vorgang *"
+            :input-label="t('caseRequired')"
             :label-outside="true"
-            placeholder="Bitte auswählen"
+            :placeholder="t('selectPlease')"
           />
           <p v-if="fieldErrors.caseId" class="field-error">{{ fieldErrors.caseId }}</p>
         </div>
         <div class="form-group">
           <NcTextField
-            label="Ausstellungsdatum *"
+            :label="t('issueDateRequired')"
             type="text"
             placeholder="YYYY-MM-DD"
             :value.sync="form.issueDate"
@@ -82,7 +82,7 @@
         </div>
         <div class="form-group">
           <NcTextField
-            label="Fällig bis"
+            :label="t('dueDate')"
             type="text"
             placeholder="YYYY-MM-DD"
             :value.sync="form.dueDate"
@@ -97,19 +97,19 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Angebot (optional)"
+            :input-label="t('offerOptional')"
             :label-outside="true"
-            placeholder="Bitte auswählen"
+            :placeholder="t('selectPlease')"
           />
           <p v-if="fieldErrors.relatedOfferId" class="field-error">{{ fieldErrors.relatedOfferId }}</p>
-          <p class="field-hint">Wird im PDF als „Angebot Nr. vom Datum“ angezeigt.</p>
+          <p class="field-hint">{{ t('offerInPdfHint') }}</p>
         </div>
         <div v-if="form.invoiceType === 'advance'" class="form-group">
           <NcDateTimePickerNative
             id="servicePeriodStart"
             v-model="form.servicePeriodStart"
             type="date"
-            label="Leistungszeitraum (Start) *"
+            :label="t('servicePeriodStart')"
           />
           <p v-if="fieldErrors.servicePeriodStart" class="field-error">
             {{ fieldErrors.servicePeriodStart }}
@@ -120,12 +120,12 @@
             id="servicePeriodEnd"
             v-model="form.servicePeriodEnd"
             type="date"
-            label="Leistungszeitraum (Ende) *"
+            :label="t('servicePeriodEnd')"
           />
           <p v-if="fieldErrors.servicePeriodEnd" class="field-error">
             {{ fieldErrors.servicePeriodEnd }}
           </p>
-          <p class="field-hint">Zeitraum erscheint in der Abschlagsrechnung.</p>
+          <p class="field-hint">{{ t('servicePeriodHint') }}</p>
         </div>
         <div class="form-group">
           <NcSelect
@@ -135,40 +135,40 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Status"
+            :input-label="t('status')"
             :label-outside="true"
           />
         </div>
         </div>
 
         <div class="form-group">
-          <NcTextArea label="Begrüßungstext" :value.sync="form.greetingText" />
+          <NcTextArea :label="t('greetingText')" :value.sync="form.greetingText" />
         </div>
         <div class="form-group">
-          <NcTextArea label="Zusatztext" :value.sync="form.extraText" />
+          <NcTextArea :label="t('extraText')" :value.sync="form.extraText" />
         </div>
         <div class="form-group">
-          <NcTextArea label="Footer-Text" :value.sync="form.footerText" />
+          <NcTextArea :label="t('footerText')" :value.sync="form.footerText" />
         </div>
       </div>
 
       <div class="positions">
         <div class="list-header">
-          <h3>Positionen</h3>
-          <NcButton type="secondary" @click="addItem">Position hinzufügen</NcButton>
+          <h3>{{ t('positions') }}</h3>
+          <NcButton type="secondary" @click="addItem">{{ t('addPosition') }}</NcButton>
         </div>
 
         <table class="table compact">
           <thead>
             <tr>
-              <th class="col-type">Typ</th>
-              <th class="col-product">Produkt</th>
-              <th>Bezeichnung</th>
-              <th>Beschreibung</th>
-              <th class="col-qty">Menge</th>
-              <th class="price">Einzelpreis</th>
-              <th class="price">Gesamt</th>
-              <th class="actions">Aktion</th>
+              <th class="col-type">{{ t('type') }}</th>
+              <th class="col-product">{{ t('product') }}</th>
+              <th>{{ t('name') }}</th>
+              <th>{{ t('description') }}</th>
+              <th class="col-qty">{{ t('quantity') }}</th>
+              <th class="price">{{ t('unitPrice') }}</th>
+              <th class="price">{{ t('total') }}</th>
+              <th class="actions">{{ t('action') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -180,7 +180,7 @@
                   :reduce="(option) => option.value"
                   :append-to-body="false"
                   :clearable="false"
-                  input-label="Typ"
+                  :input-label="t('type')"
                   :label-outside="true"
                 />
               </td>
@@ -192,9 +192,9 @@
                   :reduce="(option) => option.value"
                   :append-to-body="false"
                   :clearable="true"
-                  input-label="Produkt"
+                  :input-label="t('product')"
                   :label-outside="true"
-                  placeholder="Produkt"
+                  :placeholder="t('product')"
                   @input="syncFromProduct(item)"
                 />
                 <span v-else>–</span>
@@ -202,8 +202,8 @@
               <td class="col-qty">
                 <NcTextField
                   v-if="item.positionType === 'custom'"
-                  label="Bezeichnung"
-                  placeholder="Bezeichnung"
+                  :label="t('name')"
+                  :placeholder="t('name')"
                   :value.sync="item.name"
                 />
                 <span v-else>{{ item.name || '–' }}</span>
@@ -211,15 +211,15 @@
               <td>
                 <NcTextField
                   v-if="item.positionType === 'custom'"
-                  label="Beschreibung"
-                  placeholder="Beschreibung"
+                  :label="t('description')"
+                  :placeholder="t('description')"
                   :value.sync="item.description"
                 />
                 <span v-else>{{ item.description || '–' }}</span>
               </td>
               <td>
                 <NcTextField
-                  label="Menge *"
+                  :label="t('quantityRequired')"
                   type="text"
                   placeholder="1"
                   :value.sync="item.quantity"
@@ -227,7 +227,7 @@
               </td>
               <td class="price">
                 <NcTextField
-                  label="Einzelpreis *"
+                  :label="t('unitPriceRequired')"
                   type="text"
                   placeholder="0.00"
                   :value.sync="item.unitPrice"
@@ -237,8 +237,8 @@
               <td class="actions">
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Position entfernen"
-                  title="Entfernen"
+                  :aria-label="t('removePosition')"
+                  :title="t('remove')"
                   @click="removeItem(item)"
                 >
                   <template #icon>
@@ -247,8 +247,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Position nach oben"
-                  title="Nach oben"
+                  :aria-label="t('moveUpPosition')"
+                  :title="t('moveUp')"
                   :disabled="index === 0"
                   @click="moveItemUp(index)"
                 >
@@ -256,8 +256,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Position nach unten"
-                  title="Nach unten"
+                  :aria-label="t('moveDownPosition')"
+                  :title="t('moveDown')"
                   :disabled="index === form.items.length - 1"
                   @click="moveItemDown(index)"
                 >
@@ -271,25 +271,25 @@
 
       <div class="summary">
         <div>
-          <p>Zwischensumme: {{ formatPrice(subtotalCents) }}</p>
+          <p>{{ t('subtotal') }}: {{ formatPrice(subtotalCents) }}</p>
           <p v-if="form.isSmallBusiness">
             {{ smallBusinessNote }}
           </p>
           <p v-else>
-            Steuer ({{ formatTaxRate(form.taxRateBp) }}): {{ formatPrice(taxCents) }}
+            {{ t('tax') }} ({{ formatTaxRate(form.taxRateBp) }}): {{ formatPrice(taxCents) }}
           </p>
         </div>
         <div class="total">
-          Gesamt: {{ formatPrice(totalCents) }}
+          {{ t('total') }}: {{ formatPrice(totalCents) }}
         </div>
       </div>
       <div v-if="billingSummary" class="summary billing-summary">
         <div>
-          <p><strong>Projektübersicht</strong></p>
-          <p>Auftragssumme: {{ formatPrice(billingSummary.offerTotalCents) }}</p>
-          <p>Bisher abgerechnet (Abschläge): {{ formatPrice(billingSummary.advanceBilledCents) }}</p>
-          <p>Dieser Betrag: {{ formatPrice(billingSummary.currentCents) }}</p>
-          <p>Rest danach: {{ formatPrice(billingSummary.remainingCents) }}</p>
+          <p><strong>{{ t('projectSummary') }}</strong></p>
+          <p>{{ t('orderTotal') }}: {{ formatPrice(billingSummary.offerTotalCents) }}</p>
+          <p>{{ t('alreadyBilledAdvances') }}: {{ formatPrice(billingSummary.advanceBilledCents) }}</p>
+          <p>{{ t('thisAmount') }}: {{ formatPrice(billingSummary.currentCents) }}</p>
+          <p>{{ t('remainingAfter') }}: {{ formatPrice(billingSummary.remainingCents) }}</p>
         </div>
       </div>
 
@@ -297,11 +297,11 @@
 
       <div class="actions">
         <NcButton type="primary" :disabled="saving || !canSave" @click="save">
-          Rechnung speichern
+          {{ t('saveInvoice') }}
         </NcButton>
-        <NcButton type="secondary" @click="goBack">Abbrechen</NcButton>
-        <span v-if="saving" class="hint">Speichere…</span>
-        <span v-if="saved" class="success">Gespeichert</span>
+        <NcButton type="secondary" @click="goBack">{{ t('cancel') }}</NcButton>
+        <span v-if="saving" class="hint">{{ t('saving') }}</span>
+        <span v-if="saved" class="success">{{ t('saved') }}</span>
         <span v-if="error" class="error">{{ error }}</span>
       </div>
     </div>
@@ -465,7 +465,7 @@ export default {
   computed: {
     customerOptions() {
       return this.customers.map((customer) => ({
-        label: customer.company || 'Unbenannt',
+        label: customer.company || this.t('unnamed'),
         value: customer.id,
       }))
     },
@@ -479,8 +479,8 @@ export default {
         })
         .map((item) => ({
           label: item.caseNumber
-            ? `${item.caseNumber} – ${item.name || 'Unbenannt'}`
-            : item.name || 'Unbenannt',
+            ? `${item.caseNumber} – ${item.name || this.t('unnamed')}`
+            : item.name || this.t('unnamed'),
           value: item.id,
         }))
     },
@@ -492,27 +492,27 @@ export default {
     },
     offerOptions() {
       return this.offers.map((offer) => ({
-        label: `${offer.number || 'Angebot'} • ${this.formatDate(offer.issueDate)} • ${this.formatPrice(offer.totalCents)}`,
+        label: `${offer.number || this.t('offer')} • ${this.formatDate(offer.issueDate)} • ${this.formatPrice(offer.totalCents)}`,
         value: offer.id,
       }))
     },
     invoiceTypeOptions() {
       return [
-        { label: 'Standard', value: 'standard' },
-        { label: 'Abschlagsrechnung', value: 'advance' },
-        { label: 'Schlussrechnung', value: 'final' },
+        { label: this.t('typeStandard'), value: 'standard' },
+        { label: this.t('typeAdvance'), value: 'advance' },
+        { label: this.t('typeFinal'), value: 'final' },
       ]
     },
     positionTypeOptions() {
       return [
-        { label: 'Produkt/DL', value: 'product' },
-        { label: 'Freie Position', value: 'custom' },
+        { label: this.t('positionTypeProduct'), value: 'product' },
+        { label: this.t('positionTypeCustom'), value: 'custom' },
       ]
     },
     statusOptions() {
       return [
-        { label: 'Offen', value: 'open' },
-        { label: 'Bezahlt', value: 'paid' },
+        { label: this.t('statusOpen'), value: 'open' },
+        { label: this.t('statusPaid'), value: 'paid' },
       ]
     },
     subtotalCents() {
@@ -526,7 +526,7 @@ export default {
       return Math.round((this.subtotalCents * rate) / 10000)
     },
     smallBusinessNote() {
-      return this.tax?.smallBusinessNote || 'Kleinunternehmerregelung'
+      return this.tax?.smallBusinessNote || this.t('smallBusinessRule')
     },
     totalCents() {
       return this.subtotalCents + this.taxCents
@@ -619,6 +619,9 @@ export default {
     },
   },
   methods: {
+    t(key) {
+      return this.$tKey(`invoiceForm.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -682,7 +685,7 @@ export default {
           await this.loadInvoices(this.form.caseId)
         }
       } catch (e) {
-        this.error = 'Rechnung konnte nicht geladen werden.'
+        this.error = this.t('loadSingleError')
       } finally {
         this.loading = false
       }
@@ -722,7 +725,7 @@ export default {
       this.form.items.push(createEmptyItem())
     },
     removeItem(item) {
-      if (!window.confirm('Position wirklich entfernen?')) {
+      if (!window.confirm(this.t('removePositionConfirm'))) {
         return
       }
       this.form.items = this.form.items.filter((entry) => entry.key !== item.key)
@@ -810,29 +813,29 @@ export default {
     async save() {
       this.fieldErrors = {}
       if (!this.form.caseId) {
-        this.fieldErrors = { caseId: 'Bitte einen Vorgang auswählen.' }
+        this.fieldErrors = { caseId: this.t('caseRequiredError') }
         return
       }
       if (!this.form.customerId) {
-        this.fieldErrors = { customerId: 'Bitte einen Kunden auswählen.' }
+        this.fieldErrors = { customerId: this.t('customerRequiredError') }
         return
       }
       if (this.form.invoiceType === 'advance') {
         if (!isValidPickerDate(this.form.servicePeriodStart)) {
-          this.fieldErrors = { servicePeriodStart: 'Bitte einen gültigen Start angeben.' }
+          this.fieldErrors = { servicePeriodStart: this.t('servicePeriodStartError') }
           return
         }
         if (!isValidPickerDate(this.form.servicePeriodEnd)) {
-          this.fieldErrors = { servicePeriodEnd: 'Bitte ein gültiges Ende angeben.' }
+          this.fieldErrors = { servicePeriodEnd: this.t('servicePeriodEndError') }
           return
         }
       }
       if (!this.isValidDateInput(this.form.issueDate)) {
-        this.fieldErrors = { issueDate: 'Bitte ein gültiges Ausstellungsdatum angeben.' }
+        this.fieldErrors = { issueDate: this.t('issueDateError') }
         return
       }
       if (this.form.dueDate && !this.isValidDateInput(this.form.dueDate)) {
-        this.fieldErrors = { dueDate: 'Bitte ein gültiges Fälligkeitsdatum angeben.' }
+        this.fieldErrors = { dueDate: this.t('dueDateError') }
         return
       }
       this.saving = true
@@ -899,7 +902,7 @@ export default {
         this.saved = true
         this.goBack()
       } catch (e) {
-        this.error = 'Rechnung konnte nicht gespeichert werden.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }

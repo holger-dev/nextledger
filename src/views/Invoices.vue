@@ -2,10 +2,10 @@
   <section class="invoices">
     <div class="header">
       <div>
-        <h1>Rechnungen</h1>
-        <p class="subline">Übersicht der Rechnungen.</p>
+        <h1>{{ t('title') }}</h1>
+        <p class="subline">{{ t('subline') }}</p>
       </div>
-      <NcButton type="primary" @click="openCreateView">Neue Rechnung</NcButton>
+      <NcButton type="primary" @click="openCreateView">{{ t('newInvoice') }}</NcButton>
     </div>
 
     <NcLoadingIcon v-if="loading" />
@@ -20,14 +20,14 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="true"
-            input-label="Kunde"
+            :input-label="t('customer')"
             :label-outside="true"
-            placeholder="Alle Kunden"
+            :placeholder="t('allCustomers')"
           />
         </div>
         <div class="filter-group">
           <NcTextField
-            label="Datum von"
+            :label="t('dateFrom')"
             type="text"
             placeholder="YYYY-MM-DD"
             :value.sync="filterDateFrom"
@@ -35,7 +35,7 @@
         </div>
         <div class="filter-group">
           <NcTextField
-            label="Datum bis"
+            :label="t('dateTo')"
             type="text"
             placeholder="YYYY-MM-DD"
             :value.sync="filterDateTo"
@@ -49,7 +49,7 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Sortierung"
+            :input-label="t('sorting')"
             :label-outside="true"
           />
         </div>
@@ -57,20 +57,20 @@
 
       <NcEmptyContent
         v-if="filteredInvoices.length === 0"
-        name="Noch keine Rechnungen"
-        description="Erstelle deine erste Rechnung."
+        :name="t('emptyName')"
+        :description="t('emptyDescription')"
       />
 
       <table v-else class="table">
         <thead>
           <tr>
-            <th>Nummer</th>
-            <th>Kunde</th>
-            <th>Vorgang</th>
-            <th>Datum</th>
-            <th class="price">Gesamt</th>
-            <th>Status</th>
-            <th class="actions">Aktionen</th>
+            <th>{{ t('number') }}</th>
+            <th>{{ t('customer') }}</th>
+            <th>{{ t('case') }}</th>
+            <th>{{ t('date') }}</th>
+            <th class="price">{{ t('total') }}</th>
+            <th>{{ t('status') }}</th>
+            <th class="actions">{{ t('actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -89,8 +89,8 @@
               <td class="actions">
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Rechnung bearbeiten"
-                  title="Bearbeiten"
+                  :aria-label="t('editInvoice')"
+                  :title="t('edit')"
                   @click="openEditInvoice(invoice)"
                 >
                   <template #icon>
@@ -99,8 +99,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Rechnung verschicken"
-                  title="Verschicken"
+                  :aria-label="t('sendInvoice')"
+                  :title="t('send')"
                   @click="openSendInvoiceModal(invoice)"
                 >
                   <template #icon>
@@ -109,8 +109,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="PDF herunterladen"
-                  title="PDF herunterladen"
+                  :aria-label="t('downloadPdf')"
+                  :title="t('downloadPdf')"
                   @click="downloadPdf(invoice)"
                 >
                   <template #icon>
@@ -119,8 +119,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Rechnung als bezahlt markieren"
-                  title="Als bezahlt markieren"
+                  :aria-label="t('markInvoicePaid')"
+                  :title="t('markAsPaid')"
                   :disabled="invoice.status === 'paid'"
                   @click="markPaid(invoice)"
                 >
@@ -130,8 +130,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Rechnung löschen"
-                  title="Löschen"
+                  :aria-label="t('deleteInvoice')"
+                  :title="t('delete')"
                   @click="removeInvoice(invoice)"
                 >
                   <template #icon>
@@ -143,20 +143,20 @@
             <tr v-if="expandedId === invoice.id" :key="`detail-${invoice.id}`">
               <td colspan="7" class="detail">
                 <div class="detail-inner">
-                  <h3>Positionen</h3>
+                  <h3>{{ t('positions') }}</h3>
                   <NcEmptyContent
                     v-if="invoiceItems.length === 0"
-                    name="Keine Positionen"
-                    description="Diese Rechnung hat noch keine Positionen."
+                    :name="t('noPositions')"
+                    :description="t('noPositionsInvoiceDescription')"
                   />
                   <table v-else class="table compact">
                     <thead>
                       <tr>
-                        <th>Position</th>
-                        <th>Beschreibung</th>
-                        <th class="price">Menge</th>
-                        <th class="price">Einzel</th>
-                        <th class="price">Gesamt</th>
+                        <th>{{ t('position') }}</th>
+                        <th>{{ t('description') }}</th>
+                        <th class="price">{{ t('quantity') }}</th>
+                        <th class="price">{{ t('unit') }}</th>
+                        <th class="price">{{ t('total') }}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -182,15 +182,15 @@
 
     <NcModal v-if="showSendInvoiceModal" size="normal" @close="closeSendInvoiceModal">
       <div class="modal__content">
-        <h2>Rechnung verschicken</h2>
+        <h2>{{ t('sendInvoiceModalTitle') }}</h2>
         <template v-if="isDirectEmail">
-          <p>Die E-Mail wird direkt über den SMTP-Server versendet.</p>
+          <p>{{ directDeliveryHint }}</p>
           <div class="email-preview">
-            <p><strong>Empfänger:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
-            <p v-if="effectiveFromEmail"><strong>Absender:</strong> {{ effectiveFromEmail }}</p>
-            <p v-if="effectiveReplyToEmail"><strong>Antwort an:</strong> {{ effectiveReplyToEmail }}</p>
-            <p><strong>Betreff:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
-            <p><strong>Anhang:</strong> {{ sendInvoicePreview?.attachmentName || '–' }}</p>
+            <p><strong>{{ t('recipient') }}:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
+            <p v-if="effectiveFromEmail"><strong>{{ t('sender') }}:</strong> {{ effectiveFromEmail }}</p>
+            <p v-if="effectiveReplyToEmail"><strong>{{ t('replyTo') }}:</strong> {{ effectiveReplyToEmail }}</p>
+            <p><strong>{{ t('subject') }}:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
+            <p><strong>{{ t('attachment') }}:</strong> {{ sendInvoicePreview?.attachmentName || '–' }}</p>
             <pre class="email-body">{{ sendInvoicePreview?.body || '' }}</pre>
           </div>
           <div class="actions">
@@ -199,20 +199,20 @@
               :disabled="!canSendInvoiceEmail || sendingInvoice"
               @click="sendInvoiceDirect"
             >
-              E-Mail senden
+              {{ t('sendEmail') }}
             </NcButton>
-            <NcButton type="secondary" @click="closeSendInvoiceModal">Abbrechen</NcButton>
-            <span v-if="sendingInvoice" class="hint">Sende…</span>
-            <span v-if="sentInvoiceEmail" class="success">Gesendet</span>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">{{ t('cancel') }}</NcButton>
+            <span v-if="sendingInvoice" class="hint">{{ t('sending') }}</span>
+            <span v-if="sentInvoiceEmail" class="success">{{ t('sent') }}</span>
             <span v-if="sendInvoiceError" class="error">{{ sendInvoiceError }}</span>
           </div>
         </template>
         <template v-else>
           <p>
-            Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
+            {{ t('pdfDownloadedHint') }}
           </p>
           <p>
-            Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
+            {{ t('templateOpensHint') }}
           </p>
           <div class="actions">
             <NcButton
@@ -220,12 +220,12 @@
               :disabled="!canSendInvoiceEmail"
               @click="openInvoiceMailto"
             >
-              Mailvorlage erstellen
+              {{ t('createMailTemplate') }}
             </NcButton>
-            <NcButton type="secondary" @click="closeSendInvoiceModal">Schließen</NcButton>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">{{ t('close') }}</NcButton>
           </div>
           <p class="hint">
-            Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
+            {{ t('manualAttachmentHint') }}
           </p>
         </template>
       </div>
@@ -303,16 +303,16 @@ export default {
     },
     customerFilterOptions() {
       return this.customers.map((customer) => ({
-        label: customer.company || 'Unbenannt',
+        label: customer.company || this.t('unnamed'),
         value: customer.id,
       }))
     },
     sortOptions() {
       return [
-        { label: 'Datum (neu zuerst)', value: 'date_desc' },
-        { label: 'Datum (alt zuerst)', value: 'date_asc' },
-        { label: 'Preis (hoch zuerst)', value: 'price_desc' },
-        { label: 'Preis (niedrig zuerst)', value: 'price_asc' },
+        { label: this.t('sortDateDesc'), value: 'date_desc' },
+        { label: this.t('sortDateAsc'), value: 'date_asc' },
+        { label: this.t('sortPriceDesc'), value: 'price_desc' },
+        { label: this.t('sortPriceAsc'), value: 'price_asc' },
       ]
     },
     filteredInvoices() {
@@ -341,21 +341,29 @@ export default {
       return !!this.sendInvoiceMailto
     },
     isDirectEmail() {
-      return this.emailBehavior?.mode === 'direct'
+      const mode = this.emailBehavior?.mode
+      return mode === 'direct' || mode === 'admin_smtp' || mode === 'nextcloud_mail'
+    },
+    directDeliveryHint() {
+      if (this.emailBehavior?.mode === 'nextcloud_mail') {
+        return this.t('directDeliveryMailHint')
+      }
+      return this.t('directDeliveryAdminHint')
     },
     effectiveFromEmail() {
-      const stored = (this.emailBehavior?.fromEmail || '').trim()
-      return stored || this.emailBehavior?.defaultFromEmail || ''
+      return (this.emailBehavior?.effectiveFromEmail || '').trim()
     },
     effectiveReplyToEmail() {
-      const stored = (this.emailBehavior?.replyToEmail || '').trim()
-      return stored || this.emailBehavior?.defaultReplyToEmail || ''
+      return (this.emailBehavior?.effectiveReplyToEmail || '').trim()
     },
   },
   async mounted() {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`invoices.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -373,7 +381,7 @@ export default {
         this.texts = texts || {}
         this.emailBehavior = emailBehavior || { mode: 'manual' }
       } catch (e) {
-        this.error = 'Rechnungen konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -400,11 +408,11 @@ export default {
         this.invoiceItems = Array.isArray(items) ? items : []
       } catch (e) {
         this.invoiceItems = []
-        this.itemsError = 'Positionen konnten nicht geladen werden.'
+        this.itemsError = this.t('itemsLoadError')
       }
     },
     async removeInvoice(invoice) {
-      if (!window.confirm('Rechnung wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteConfirm'))) {
         return
       }
       try {
@@ -415,7 +423,7 @@ export default {
           this.invoiceItems = []
         }
       } catch (e) {
-        this.error = 'Rechnung konnte nicht gelöscht werden.'
+        this.error = this.t('deleteError')
       }
     },
     async markPaid(invoice) {
@@ -429,7 +437,7 @@ export default {
           item.id === invoice.id ? { ...item, status: 'paid' } : item
         )
       } catch (e) {
-        this.error = 'Status konnte nicht aktualisiert werden.'
+        this.error = this.t('statusUpdateError')
       }
     },
     buildUpdatePayload(invoice, status) {
@@ -500,7 +508,9 @@ export default {
       const customer = this.customers.find((entry) => entry.id === invoice.customerId)
       const caseItem = this.cases.find((entry) => entry.id === invoice.caseId)
       const contact = (customer?.contactName || '').trim()
-      const salutation = contact ? `Hallo ${contact}` : 'Sehr geehrte Damen und Herren'
+      const salutation = contact
+        ? this.t('salutationContact').replace('{name}', contact)
+        : this.t('salutationDefault')
       const context = {
         invoiceNumber: invoice.number || '',
         customerName: customer?.company || '',
@@ -513,10 +523,10 @@ export default {
           : '',
       }
 
-      const subjectTemplate = this.texts?.invoiceEmailSubject || 'Rechnung {{invoiceNumber}}'
+      const subjectTemplate = this.texts?.invoiceEmailSubject || this.t('defaultEmailSubject')
       const bodyTemplate =
         this.texts?.invoiceEmailBody ||
-        '{{customerSalutation}},\n\nanbei die Rechnung {{invoiceNumber}}.\n\nViele Grüße'
+        this.t('defaultEmailBody')
 
       const recipients = this.buildInvoiceRecipients(caseItem, customer)
       return {
@@ -547,7 +557,7 @@ export default {
           this.closeSendInvoiceModal()
         }, 700)
       } catch (e) {
-        this.sendInvoiceError = 'E-Mail konnte nicht gesendet werden.'
+        this.sendInvoiceError = this.t('sendError')
       } finally {
         this.sendingInvoice = false
       }
@@ -634,10 +644,10 @@ export default {
     },
     statusLabel(status) {
       if (status === 'paid') {
-        return 'Bezahlt'
+        return this.t('paid')
       }
       if (status === 'open') {
-        return 'Offen'
+        return this.t('open')
       }
       return status || '–'
     },
@@ -650,9 +660,9 @@ export default {
         return '–'
       }
       if (item.caseNumber) {
-        return `${item.caseNumber} – ${item.name || 'Unbenannt'}`
+        return `${item.caseNumber} – ${item.name || this.t('unnamed')}`
       }
-      return item.name || 'Unbenannt'
+      return item.name || this.t('unnamed')
     },
   },
 }

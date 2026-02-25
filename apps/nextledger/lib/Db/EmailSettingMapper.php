@@ -15,10 +15,20 @@ class EmailSettingMapper extends BaseMapper {
     }
 
     public function findByUserId(string $userId): ?EmailSetting {
+        return $this->findByUserAndCompanyId($userId, null);
+    }
+
+    public function findByUserAndCompanyId(string $userId, ?int $companyId): ?EmailSetting {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
-            ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)));
+            ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId, IQueryBuilder::PARAM_STR)));
+
+        if ($companyId === null) {
+            $qb->andWhere($qb->expr()->isNull('company_id'));
+        } else {
+            $qb->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)));
+        }
 
         try {
             /** @var EmailSetting $entity */

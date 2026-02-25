@@ -25,6 +25,10 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\IRequest;
 use OCP\Mail\IMailer;
+use OCP\Mail\Provider\Address;
+use OCP\Mail\Provider\Attachment;
+use OCP\Mail\Provider\IManager as IMailProviderManager;
+use OCP\Mail\Provider\IMessageSend;
 
 class InvoicesController extends ApiController {
     public function __construct(
@@ -37,6 +41,7 @@ class InvoicesController extends ApiController {
         private InvoicePdfService $invoicePdfService,
         private IMailer $mailer,
         private EmailSettingsService $emailSettingsService,
+        private IMailProviderManager $mailProviderManager,
         private CaseEntityMapper $caseMapper,
         private CustomerMapper $customerMapper,
         private ActiveCompanyService $activeCompanyService,
@@ -420,6 +425,20 @@ class InvoicesController extends ApiController {
     }
 
     private function sendWithAttachment(array $recipients, string $subject, string $body, string $filename, string $content): void {
+        $delivery = $this->emailSettingsService->getDeliveryConfig();
+        if ($delivery['mode'] === 'nextcloud_mail') {
+            $this->sendWithMailProvider(
+                $recipients,
+                $subject,
+                $body,
+                $filename,
+                $content,
+                (string)$delivery['providerId'],
+                (string)$delivery['serviceId']
+            );
+            return;
+        }
+
         $message = $this->mailer->createMessage();
         $message->setTo($recipients);
         $message->setSubject($subject);
@@ -441,6 +460,54 @@ class InvoicesController extends ApiController {
         } finally {
             @unlink($tmpPath);
         }
+    }
+
+    private function sendWithMailProvider(
+        array $recipients,
+        string $subject,
+        string $body,
+        string $filename,
+        string $content,
+        string $providerId,
+        string $serviceId
+    ): void {
+        $userId = $this->emailSettingsService->getCurrentUserId();
+        if ($userId === null || $serviceId === '') {
+            throw new \RuntimeException('Mail provider configuration is incomplete');
+        }
+
+        $service = $this->mailProviderManager->findServiceById($userId, $serviceId, $providerId ?: null);
+        if (!$service instanceof IMessageSend || !$service->capable('MessageSend')) {
+            throw new \RuntimeException('Selected mail provider service can not send messages');
+        }
+
+        $message = $service->initiateMessage();
+        $message->setTo(...array_map(static fn(string $email) => new Address($email), $recipients));
+        $message->setSubject($subject);
+        $message->setBodyPlain($body);
+
+        $primaryAddress = trim((string)($service->getPrimaryAddress()?->getAddress() ?: ''));
+        $overrides = $this->emailSettingsService->getConfiguredOverrides();
+        $fromEmail = trim((string)($overrides['fromEmail'] ?? ''));
+        $replyToEmail = trim((string)($overrides['replyToEmail'] ?? ''));
+        if ($fromEmail === '') {
+            $fromEmail = $primaryAddress;
+        }
+        if ($replyToEmail === '') {
+            $replyToEmail = $primaryAddress;
+        }
+
+        if ($fromEmail !== '') {
+            $message->setFrom(new Address($fromEmail));
+        }
+        if ($replyToEmail !== '') {
+            $message->setReplyTo(new Address($replyToEmail));
+        }
+
+        $message->setAttachments(
+            new Attachment($content, $filename, 'application/pdf')
+        );
+        $service->sendMessage($message);
     }
 
     private function writeTempAttachment(string $filename, string $content): string {

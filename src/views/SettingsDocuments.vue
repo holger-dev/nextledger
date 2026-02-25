@@ -1,6 +1,6 @@
 <template>
   <section class="settings">
-    <h1>Dokumente</h1>
+    <h1>{{ t('title') }}</h1>
 
     <NcLoadingIcon v-if="loading" />
 
@@ -9,7 +9,7 @@
         :checked.sync="form.autoStorePdfs"
         type="switch"
       >
-        Rechnungs- und Angebots-PDFs automatisch in Dateien speichern
+        {{ t('autoStore') }}
       </NcCheckboxRadioSwitch>
 
       <NcCheckboxRadioSwitch
@@ -17,19 +17,19 @@
         type="switch"
         :disabled="!form.autoStorePdfs"
       >
-        Versionierung aktivieren (z.B. RE20260221-0001_v1, _v2, _v3)
+        {{ t('versioning') }}
       </NcCheckboxRadioSwitch>
 
       <p class="hint" v-if="form.autoStorePdfs">
-        Ablagepfad: Dateien / NextLedger / Firma / Wirtschaftsjahr
+        {{ t('pathHint') }}
       </p>
 
       <div class="actions">
         <NcButton type="primary" :disabled="saving" @click="save">
-          Speichern
+          {{ t('save') }}
         </NcButton>
-        <span v-if="saving" class="hint">Speichere…</span>
-        <span v-if="saved" class="success">Gespeichert</span>
+        <span v-if="saving" class="hint">{{ t('saving') }}</span>
+        <span v-if="saved" class="success">{{ t('saved') }}</span>
         <span v-if="error" class="error">{{ error }}</span>
       </div>
     </div>
@@ -63,6 +63,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`settingsDocuments.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -73,7 +76,7 @@ export default {
           keepPdfVersions: Boolean(data.keepPdfVersions),
         }
       } catch (e) {
-        this.error = 'Einstellungen konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -95,7 +98,7 @@ export default {
           this.saved = false
         }, 2000)
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }

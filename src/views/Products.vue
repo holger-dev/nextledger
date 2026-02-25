@@ -2,11 +2,11 @@
   <section class="products">
     <div class="header">
       <div>
-        <h1>Produkte & Dienstleistungen</h1>
-        <p class="subline">Übersicht der Produkte und Dienstleistungen.</p>
+        <h1>{{ t('title') }}</h1>
+        <p class="subline">{{ t('subline') }}</p>
       </div>
       <NcButton type="primary" @click="openCreateModal">
-        Neues Produkt/DL
+        {{ t('newProduct') }}
       </NcButton>
     </div>
 
@@ -16,8 +16,8 @@
       <div class="filters">
         <div class="filter-group">
           <NcTextField
-            label="Suche"
-            placeholder="Name oder Beschreibung…"
+            :label="t('searchLabel')"
+            :placeholder="t('searchPlaceholder')"
             :value.sync="query"
           />
         </div>
@@ -25,17 +25,17 @@
 
       <NcEmptyContent
         v-if="filteredItems.length === 0"
-        name="Noch keine Produkte"
-        description="Lege Produkte oder Dienstleistungen an."
+        :name="t('emptyName')"
+        :description="t('emptyDescription')"
       />
 
       <table v-else class="table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Beschreibung</th>
-            <th class="price">Stückpreis</th>
-            <th class="actions">Aktionen</th>
+            <th>{{ t('name') }}</th>
+            <th>{{ t('description') }}</th>
+            <th class="price">{{ t('unitPrice') }}</th>
+            <th class="actions">{{ t('actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -46,8 +46,8 @@
             <td class="actions">
               <NcButton
                 type="tertiary-no-background"
-                aria-label="Produkt bearbeiten"
-                title="Bearbeiten"
+                :aria-label="t('editProduct')"
+                :title="t('edit')"
                 @click="editItem(item)"
               >
                 <template #icon>
@@ -56,8 +56,8 @@
               </NcButton>
               <NcButton
                 type="tertiary-no-background"
-                aria-label="Produkt löschen"
-                title="Löschen"
+                :aria-label="t('deleteProduct')"
+                :title="t('delete')"
                 @click="removeItem(item)"
               >
                 <template #icon>
@@ -74,18 +74,18 @@
 
     <NcModal v-if="showModal" size="normal" @close="closeModal">
       <div class="modal__content">
-        <h2>{{ editingId ? 'Produkt/DL bearbeiten' : 'Neues Produkt/DL' }}</h2>
+        <h2>{{ editingId ? t('editProductTitle') : t('newProductTitle') }}</h2>
 
         <div class="form-group">
-          <NcTextField label="Name *" :value.sync="form.name" />
+          <NcTextField :label="t('nameRequired')" :value.sync="form.name" />
           <p v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</p>
         </div>
         <div class="form-group">
-          <NcTextField label="Beschreibung" :value.sync="form.description" />
+          <NcTextField :label="t('description')" :value.sync="form.description" />
         </div>
         <div class="form-group">
           <NcTextField
-            label="Stückpreis *"
+            :label="t('unitPriceRequired')"
             :value.sync="form.unitPrice"
             type="text"
             placeholder="0.00"
@@ -95,11 +95,11 @@
 
         <div class="actions">
           <NcButton type="primary" :disabled="saving || !canSave" @click="save">
-            {{ editingId ? 'Aktualisieren' : 'Anlegen' }}
+            {{ editingId ? t('update') : t('create') }}
           </NcButton>
-          <NcButton type="secondary" @click="closeModal">Abbrechen</NcButton>
-          <span v-if="saving" class="hint">Speichere…</span>
-          <span v-if="saved" class="success">Gespeichert</span>
+          <NcButton type="secondary" @click="closeModal">{{ t('cancel') }}</NcButton>
+          <span v-if="saving" class="hint">{{ t('saving') }}</span>
+          <span v-if="saved" class="success">{{ t('saved') }}</span>
           <span v-if="error" class="error">{{ error }}</span>
         </div>
       </div>
@@ -207,6 +207,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`products.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -214,7 +217,7 @@ export default {
         const data = await getProducts()
         this.items = Array.isArray(data) ? data : []
       } catch (e) {
-        this.error = 'Produkte konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -256,10 +259,10 @@ export default {
       if (!this.canSave) {
         const errors = {}
         if (!this.form.name.trim()) {
-          errors.name = 'Bitte einen Namen angeben.'
+          errors.name = this.t('nameError')
         }
         if (centsFromInput(this.form.unitPrice) === null) {
-          errors.unitPrice = 'Bitte einen gültigen Stückpreis angeben.'
+          errors.unitPrice = this.t('unitPriceError')
         }
         this.fieldErrors = errors
         return
@@ -267,7 +270,7 @@ export default {
 
       const cents = centsFromInput(this.form.unitPrice)
       if (cents === null || cents < 0) {
-        this.fieldErrors = { unitPrice: 'Stückpreis muss eine Zahl >= 0 sein.' }
+        this.fieldErrors = { unitPrice: this.t('unitPriceMinError') }
         return
       }
 
@@ -299,13 +302,13 @@ export default {
         }, 2000)
         this.closeModal()
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }
     },
     async removeItem(item) {
-      if (!window.confirm('Produkt/DL wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteConfirm'))) {
         return
       }
       this.saving = true
@@ -320,7 +323,7 @@ export default {
           this.closeModal()
         }
       } catch (e) {
-        this.error = 'Löschen fehlgeschlagen.'
+        this.error = this.t('deleteError')
       } finally {
         this.saving = false
       }

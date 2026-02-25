@@ -1,102 +1,98 @@
 <template>
   <section class="settings">
-    <h1>Texte</h1>
+    <h1>{{ t('title') }}</h1>
 
     <NcLoadingIcon v-if="loading" />
 
     <div v-else class="form">
       <div class="section">
         <div class="section__header">
-          <h2>PDF-Texte</h2>
-          <p class="hint">Diese Texte erscheinen im Angebot bzw. in der Rechnung als PDF.</p>
+          <h2>{{ t('pdfTextsTitle') }}</h2>
+          <p class="hint">{{ t('pdfTextsHint') }}</p>
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint">Erscheint in der Rechnung oberhalb der Positionen.</p>
-          <NcTextArea label="Begrüßungstext Rechnung" :value.sync="form.invoiceGreeting" />
+          <p class="text-block__hint">{{ t('invoiceGreetingHint') }}</p>
+          <NcTextArea :label="t('invoiceGreetingLabel')" :value.sync="form.invoiceGreeting" />
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint">Erscheint im Angebot oberhalb der Positionen.</p>
-          <NcTextArea label="Begrüßungstext Angebot" :value.sync="form.offerGreeting" />
+          <p class="text-block__hint">{{ t('offerGreetingHint') }}</p>
+          <NcTextArea :label="t('offerGreetingLabel')" :value.sync="form.offerGreeting" />
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint">Erscheint nach der Gesamtsumme und vor „Mit freundlichen Grüßen“.</p>
-          <NcTextArea label="Abschlusstext Rechnung" :value.sync="form.invoiceClosingText" />
+          <p class="text-block__hint">{{ t('closingHint') }}</p>
+          <NcTextArea :label="t('invoiceClosingLabel')" :value.sync="form.invoiceClosingText" />
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint">Erscheint nach der Gesamtsumme und vor „Mit freundlichen Grüßen“.</p>
-          <NcTextArea label="Abschlusstext Angebot" :value.sync="form.offerClosingText" />
+          <p class="text-block__hint">{{ t('closingHint') }}</p>
+          <NcTextArea :label="t('offerClosingLabel')" :value.sync="form.offerClosingText" />
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint">Erscheint im Fußbereich jeder PDF-Seite.</p>
-          <NcTextArea label="Footer-Text (PDF)" :value.sync="form.footerText" />
+          <p class="text-block__hint">{{ t('footerHint') }}</p>
+          <NcTextArea :label="t('footerLabel')" :value.sync="form.footerText" />
         </div>
       </div>
 
       <div class="section">
         <div class="section__header">
-          <h2>E-Mail Texte</h2>
-          <p class="hint">Diese Texte werden als E-Mail-Vorlage verwendet.</p>
+          <h2>{{ t('emailTextsTitle') }}</h2>
+          <p class="hint">{{ t('emailTextsHint') }}</p>
         </div>
         <div class="text-block">
-          <p class="text-block__hint" v-pre>
-            Platzhalter: {{offerNumber}}, {{customerName}}, {{customerContact}},
-            {{customerSalutation}}, {{caseName}}, {{total}}, {{issueDate}}
+          <p class="text-block__hint">
+            {{ t('offerPlaceholdersHint') }}
           </p>
           <NcTextArea
-            label="E-Mail Betreff Angebot"
+            :label="t('offerEmailSubjectLabel')"
             :value.sync="form.offerEmailSubject"
-            :placeholder="'z. B. Angebot {{offerNumber}}'"
+            :placeholder="t('offerEmailSubjectPlaceholder')"
           />
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint" v-pre>
-            Platzhalter: {{offerNumber}}, {{customerName}}, {{customerContact}},
-            {{customerSalutation}}, {{caseName}}, {{total}}, {{issueDate}}
+          <p class="text-block__hint">
+            {{ t('offerPlaceholdersHint') }}
           </p>
           <NcTextArea
-            label="E-Mail Text Angebot"
+            :label="t('offerEmailBodyLabel')"
             :value.sync="form.offerEmailBody"
-            :placeholder="'z. B. {{customerSalutation}},\\n\\nanbei das Angebot {{offerNumber}}.'"
+            :placeholder="t('offerEmailBodyPlaceholder')"
           />
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint" v-pre>
-            Platzhalter: {{invoiceNumber}}, {{customerName}}, {{customerContact}},
-            {{customerSalutation}}, {{caseName}}, {{total}}, {{issueDate}}
+          <p class="text-block__hint">
+            {{ t('invoicePlaceholdersHint') }}
           </p>
           <NcTextArea
-            label="E-Mail Betreff Rechnung"
+            :label="t('invoiceEmailSubjectLabel')"
             :value.sync="form.invoiceEmailSubject"
-            :placeholder="'z. B. Rechnung {{invoiceNumber}}'"
+            :placeholder="t('invoiceEmailSubjectPlaceholder')"
           />
         </div>
 
         <div class="text-block">
-          <p class="text-block__hint" v-pre>
-            Platzhalter: {{invoiceNumber}}, {{customerName}}, {{customerContact}},
-            {{customerSalutation}}, {{caseName}}, {{total}}, {{issueDate}}
+          <p class="text-block__hint">
+            {{ t('invoicePlaceholdersHint') }}
           </p>
           <NcTextArea
-            label="E-Mail Text Rechnung"
+            :label="t('invoiceEmailBodyLabel')"
             :value.sync="form.invoiceEmailBody"
-            :placeholder="'z. B. {{customerSalutation}},\\n\\nanbei die Rechnung {{invoiceNumber}}.'"
+            :placeholder="t('invoiceEmailBodyPlaceholder')"
           />
         </div>
       </div>
 
       <div class="actions">
         <NcButton type="primary" :disabled="saving" @click="save">
-          Speichern
+          {{ t('save') }}
         </NcButton>
-        <span v-if="saving" class="hint">Speichere…</span>
-        <span v-if="saved" class="success">Gespeichert</span>
+        <span v-if="saving" class="hint">{{ t('saving') }}</span>
+        <span v-if="saved" class="success">{{ t('saved') }}</span>
         <span v-if="error" class="error">{{ error }}</span>
       </div>
     </div>
@@ -138,6 +134,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`settingsTexts.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -157,7 +156,7 @@ export default {
           invoiceEmailBody: safeString(data.invoiceEmailBody),
         }
       } catch (e) {
-        this.error = 'Daten konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -174,7 +173,7 @@ export default {
           this.saved = false
         }, 2000)
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }

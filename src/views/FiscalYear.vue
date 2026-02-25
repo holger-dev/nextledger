@@ -1,9 +1,9 @@
 <template>
   <section class="fiscal-year">
     <div class="page-header">
-      <h1>Wirtschaftsjahr</h1>
+      <h1>{{ t('title') }}</h1>
       <NcButton v-if="standalone" type="secondary" @click="goToOverview">
-        Übersicht
+        {{ t('overview') }}
       </NcButton>
     </div>
 
@@ -12,33 +12,33 @@
     <div v-else class="layout">
       <div v-if="!standalone" class="list">
         <div class="list-header">
-          <h2>Übersicht</h2>
+          <h2>{{ t('overview') }}</h2>
           <NcButton type="primary" @click="openCreateModal">
-            Neues Wirtschaftsjahr
+            {{ t('newFiscalYear') }}
           </NcButton>
         </div>
 
         <div class="list-filters">
           <NcTextField
-            label="Suche"
-            placeholder="Name oder Zeitraum…"
+            :label="t('search')"
+            :placeholder="t('searchPlaceholder')"
             :value.sync="query"
           />
         </div>
 
         <NcEmptyContent
           v-if="filteredItems.length === 0"
-          name="Noch kein Wirtschaftsjahr"
-          description="Lege ein Wirtschaftsjahr an, um Einnahmen und Ausgaben zu verwalten."
+          :name="t('emptyName')"
+          :description="t('emptyDescription')"
         />
 
         <table v-else class="table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Zeitraum</th>
-              <th>Status</th>
-              <th class="actions">Aktionen</th>
+              <th>{{ t('name') }}</th>
+              <th>{{ t('period') }}</th>
+              <th>{{ t('status') }}</th>
+              <th class="actions">{{ t('actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -54,20 +54,20 @@
               </td>
               <td>{{ formatRange(item.dateStart, item.dateEnd) }}</td>
               <td>
-                <span v-if="item.isActive" class="status active">Aktiv</span>
-                <span v-else class="status inactive">Inaktiv</span>
+                <span v-if="item.isActive" class="status active">{{ t('active') }}</span>
+                <span v-else class="status inactive">{{ t('inactive') }}</span>
               </td>
               <td class="actions">
                 <NcButton
                   type="tertiary"
                   @click="openYearDetail(item)"
                 >
-                  Öffnen
+                  {{ t('open') }}
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Details anzeigen"
-                  title="Details"
+                  :aria-label="t('showDetails')"
+                  :title="t('details')"
                   @click="openYearDetail(item)"
                 >
                   <template #icon>
@@ -76,8 +76,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Wirtschaftsjahr bearbeiten"
-                  title="Bearbeiten"
+                  :aria-label="t('editFiscalYear')"
+                  :title="t('edit')"
                   @click="editItem(item)"
                 >
                   <template #icon>
@@ -86,8 +86,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Wirtschaftsjahr löschen"
-                  title="Löschen"
+                  :aria-label="t('deleteFiscalYear')"
+                  :title="t('delete')"
                   @click="removeItem(item)"
                 >
                   <template #icon>
@@ -107,46 +107,46 @@
             <p class="subline">{{ formatRange(selectedYear.dateStart, selectedYear.dateEnd) }}</p>
           </div>
           <NcButton type="secondary" @click="downloadGubPdf">
-            GÜB als PDF exportieren
+            {{ t('exportGub') }}
           </NcButton>
         </div>
 
         <div class="gub-summary">
           <div>
-            <p>Einnahmen: {{ formatMoney(incomeTotalCents) }}</p>
-            <p>Ausgaben: {{ formatMoney(expenseTotalCents) }}</p>
+            <p>{{ t('income') }}: {{ formatMoney(incomeTotalCents) }}</p>
+            <p>{{ t('expenses') }}: {{ formatMoney(expenseTotalCents) }}</p>
           </div>
           <div class="profit">
-            Gewinn/Überschuss: {{ formatMoney(profitCents) }}
+            {{ t('profit') }}: {{ formatMoney(profitCents) }}
           </div>
         </div>
 
         <div class="detail-grid">
           <div class="panel">
             <div class="panel-header">
-              <h3>Einnahmen</h3>
+              <h3>{{ t('income') }}</h3>
               <NcButton type="secondary" @click="resetIncomeForm">
-                Neue Einnahme
+                {{ t('newIncome') }}
               </NcButton>
             </div>
             <NcEmptyContent
               v-if="incomes.length === 0"
-              name="Keine Einnahmen"
-              description="Rechnungen werden automatisch als Einnahmen erfasst."
+              :name="t('noIncome')"
+              :description="t('noIncomeDescription')"
             />
             <table v-else class="table compact">
               <thead>
                 <tr>
-                  <th>Beschreibung</th>
-                  <th>Datum</th>
-                  <th class="price">Betrag</th>
-                  <th>Status</th>
-                  <th class="actions">Aktionen</th>
+                  <th>{{ t('description') }}</th>
+                  <th>{{ t('date') }}</th>
+                  <th class="price">{{ t('amount') }}</th>
+                  <th>{{ t('status') }}</th>
+                  <th class="actions">{{ t('actions') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="income in incomes" :key="income.id">
-                  <td class="name">{{ income.name || income.description || 'Einnahme' }}</td>
+                  <td class="name">{{ income.name || income.description || t('incomeItem') }}</td>
                   <td>{{ formatDate(income.bookedAt) }}</td>
                   <td class="price">{{ formatMoney(income.amountCents) }}</td>
                   <td>{{ incomeStatusLabel(income.status) }}</td>
@@ -154,8 +154,8 @@
                     <NcButton
                       v-if="income.invoiceId"
                       type="tertiary-no-background"
-                      aria-label="Einnahme als bezahlt markieren"
-                      title="Als bezahlt markieren"
+                      :aria-label="t('markIncomePaid')"
+                      :title="t('markAsPaid')"
                       :disabled="income.status === 'paid'"
                       @click="markIncomePaid(income)"
                     >
@@ -166,8 +166,8 @@
                     <NcButton
                       v-if="!income.invoiceId"
                       type="tertiary-no-background"
-                      aria-label="Einnahme bearbeiten"
-                      title="Bearbeiten"
+                      :aria-label="t('editIncome')"
+                      :title="t('edit')"
                       @click="editIncome(income)"
                     >
                       <template #icon>
@@ -177,8 +177,8 @@
                     <NcButton
                       v-if="!income.invoiceId"
                       type="tertiary-no-background"
-                      aria-label="Einnahme löschen"
-                      title="Löschen"
+                      :aria-label="t('deleteIncome')"
+                      :title="t('delete')"
                       @click="removeIncome(income)"
                     >
                       <template #icon>
@@ -194,36 +194,36 @@
 
           <div class="panel">
             <div class="panel-header">
-              <h3>Ausgaben</h3>
+              <h3>{{ t('expenses') }}</h3>
               <NcButton type="secondary" @click="resetExpenseForm">
-                Neue Ausgabe
+                {{ t('newExpense') }}
               </NcButton>
             </div>
 
             <NcEmptyContent
               v-if="expenses.length === 0"
-              name="Keine Ausgaben"
-              description="Lege eine Ausgabe an."
+              :name="t('noExpenses')"
+              :description="t('noExpensesDescription')"
             />
             <table v-else class="table compact">
               <thead>
                 <tr>
-                  <th>Ausgabe</th>
-                  <th>Datum</th>
-                  <th class="price">Betrag</th>
-                  <th class="actions">Aktionen</th>
+                  <th>{{ t('expense') }}</th>
+                  <th>{{ t('date') }}</th>
+                  <th class="price">{{ t('amount') }}</th>
+                  <th class="actions">{{ t('actions') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="expense in expenses" :key="expense.id">
-                  <td class="name">{{ expense.name || 'Ausgabe' }}</td>
+                  <td class="name">{{ expense.name || t('expense') }}</td>
                   <td>{{ formatDate(expense.bookedAt) }}</td>
                   <td class="price">{{ formatMoney(expense.amountCents) }}</td>
                   <td class="actions">
                     <NcButton
                       type="tertiary-no-background"
-                      aria-label="Ausgabe bearbeiten"
-                      title="Bearbeiten"
+                      :aria-label="t('editExpense')"
+                      :title="t('edit')"
                       @click="editExpense(expense)"
                     >
                       <template #icon>
@@ -232,8 +232,8 @@
                     </NcButton>
                     <NcButton
                       type="tertiary-no-background"
-                      aria-label="Ausgabe löschen"
-                      title="Löschen"
+                      :aria-label="t('deleteExpense')"
+                      :title="t('delete')"
                       @click="removeExpense(expense)"
                     >
                       <template #icon>
@@ -254,15 +254,15 @@
 
     <NcModal v-if="showModal" size="normal" @close="closeModal">
       <div class="modal__content">
-        <h2>{{ editingId ? 'Wirtschaftsjahr bearbeiten' : 'Neues Wirtschaftsjahr' }}</h2>
+        <h2>{{ editingId ? t('editFiscalYearTitle') : t('newFiscalYear') }}</h2>
 
         <div class="form-group">
-          <NcTextField label="Name *" :value.sync="form.name" />
+          <NcTextField :label="t('nameRequired')" :value.sync="form.name" />
           <p v-if="yearFieldErrors.name" class="field-error">{{ yearFieldErrors.name }}</p>
         </div>
         <div class="form-group">
           <NcDateTimePickerNative
-            label="Datum von *"
+            :label="t('dateFromRequired')"
             type="date"
             id="fiscal-year-date-start"
             :value="form.dateStart"
@@ -272,7 +272,7 @@
         </div>
         <div class="form-group">
           <NcDateTimePickerNative
-            label="Datum bis *"
+            :label="t('dateToRequired')"
             type="date"
             id="fiscal-year-date-end"
             :value="form.dateEnd"
@@ -285,17 +285,17 @@
             type="switch"
             :checked.sync="form.isActive"
           >
-            Aktives Wirtschaftsjahr
+            {{ t('activeFiscalYear') }}
           </NcCheckboxRadioSwitch>
         </div>
 
         <div class="actions">
           <NcButton type="primary" :disabled="saving || !canSave" @click="save">
-            {{ editingId ? 'Aktualisieren' : 'Anlegen' }}
+            {{ editingId ? t('update') : t('create') }}
           </NcButton>
-          <NcButton type="secondary" @click="closeModal">Abbrechen</NcButton>
-          <span v-if="saving" class="hint">Speichere…</span>
-          <span v-if="saved" class="success">Gespeichert</span>
+          <NcButton type="secondary" @click="closeModal">{{ t('cancel') }}</NcButton>
+          <span v-if="saving" class="hint">{{ t('saving') }}</span>
+          <span v-if="saved" class="success">{{ t('saved') }}</span>
           <span v-if="error" class="error">{{ error }}</span>
         </div>
       </div>
@@ -303,19 +303,19 @@
 
     <NcModal v-if="showExpenseModal" size="normal" @close="closeExpenseModal">
       <div class="modal__content">
-        <h2>{{ editingExpenseId ? 'Ausgabe bearbeiten' : 'Neue Ausgabe' }}</h2>
+        <h2>{{ editingExpenseId ? t('editExpenseTitle') : t('newExpense') }}</h2>
         <p class="subline" v-if="selectedYear">
-          Wirtschaftsjahr: {{ selectedYear.name }}
+          {{ t('fiscalYearLabel') }}: {{ selectedYear.name }}
         </p>
 
         <div class="form-stack">
           <div class="form-group">
-            <NcTextField label="Name *" :value.sync="expenseForm.name" />
+            <NcTextField :label="t('nameRequired')" :value.sync="expenseForm.name" />
             <p v-if="expenseFieldErrors.name" class="field-error">{{ expenseFieldErrors.name }}</p>
           </div>
           <div class="form-group">
             <NcDateTimePickerNative
-              label="Datum *"
+              :label="t('dateRequired')"
               type="date"
               id="fiscal-year-expense-date"
               :value="expenseForm.bookedAt"
@@ -325,7 +325,7 @@
           </div>
           <div class="form-group">
             <NcTextField
-              label="Betrag *"
+              :label="t('amountRequired')"
               type="text"
               placeholder="0.00"
               :value.sync="expenseForm.amount"
@@ -333,16 +333,16 @@
             <p v-if="expenseFieldErrors.amount" class="field-error">{{ expenseFieldErrors.amount }}</p>
           </div>
           <div class="form-group">
-            <NcTextArea label="Beschreibung" :value.sync="expenseForm.description" />
+            <NcTextArea :label="t('description')" :value.sync="expenseForm.description" />
           </div>
         </div>
         <div class="actions">
           <NcButton type="primary" :disabled="savingExpense || !canSaveExpense" @click="saveExpense">
-            {{ editingExpenseId ? 'Aktualisieren' : 'Anlegen' }}
+            {{ editingExpenseId ? t('update') : t('create') }}
           </NcButton>
-          <NcButton type="secondary" @click="closeExpenseModal">Abbrechen</NcButton>
-          <span v-if="savingExpense" class="hint">Speichere…</span>
-          <span v-if="savedExpense" class="success">Gespeichert</span>
+          <NcButton type="secondary" @click="closeExpenseModal">{{ t('cancel') }}</NcButton>
+          <span v-if="savingExpense" class="hint">{{ t('saving') }}</span>
+          <span v-if="savedExpense" class="success">{{ t('saved') }}</span>
           <span v-if="expenseError" class="error">{{ expenseError }}</span>
         </div>
       </div>
@@ -350,21 +350,21 @@
 
     <NcModal v-if="showIncomeModal" size="normal" @close="closeIncomeModal">
       <div class="modal__content">
-        <h2>{{ editingIncomeId ? 'Einnahme bearbeiten' : 'Neue Einnahme' }}</h2>
+        <h2>{{ editingIncomeId ? t('editIncomeTitle') : t('newIncome') }}</h2>
         <p class="subline" v-if="selectedYear">
-          Wirtschaftsjahr: {{ selectedYear.name }}
+          {{ t('fiscalYearLabel') }}: {{ selectedYear.name }}
         </p>
 
         <div class="form-stack">
           <div class="form-group">
-            <NcTextField label="Name *" :value.sync="incomeForm.name" />
+            <NcTextField :label="t('nameRequired')" :value.sync="incomeForm.name" />
             <p v-if="incomeFieldErrors.name" class="field-error">
               {{ incomeFieldErrors.name }}
             </p>
           </div>
           <div class="form-group">
             <NcDateTimePickerNative
-              label="Datum *"
+              :label="t('dateRequired')"
               type="date"
               id="fiscal-year-income-date"
               :value="incomeForm.bookedAt"
@@ -376,7 +376,7 @@
           </div>
           <div class="form-group">
             <NcTextField
-              label="Betrag *"
+              :label="t('amountRequired')"
               type="text"
               placeholder="0.00"
               :value.sync="incomeForm.amount"
@@ -386,16 +386,16 @@
             </p>
           </div>
           <div class="form-group">
-            <NcTextArea label="Beschreibung" :value.sync="incomeForm.description" />
+            <NcTextArea :label="t('description')" :value.sync="incomeForm.description" />
           </div>
         </div>
         <div class="actions">
           <NcButton type="primary" :disabled="savingIncome || !canSaveIncome" @click="saveIncome">
-            {{ editingIncomeId ? 'Aktualisieren' : 'Anlegen' }}
+            {{ editingIncomeId ? t('update') : t('create') }}
           </NcButton>
-          <NcButton type="secondary" @click="closeIncomeModal">Abbrechen</NcButton>
-          <span v-if="savingIncome" class="hint">Speichere…</span>
-          <span v-if="savedIncome" class="success">Gespeichert</span>
+          <NcButton type="secondary" @click="closeIncomeModal">{{ t('cancel') }}</NcButton>
+          <span v-if="savingIncome" class="hint">{{ t('saving') }}</span>
+          <span v-if="savedIncome" class="success">{{ t('saved') }}</span>
           <span v-if="incomeError" class="error">{{ incomeError }}</span>
         </div>
       </div>
@@ -628,6 +628,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`fiscalYear.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -648,7 +651,7 @@ export default {
           await this.loadYearData(this.selectedYearId)
         }
       } catch (e) {
-        this.error = 'Wirtschaftsjahre konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -682,7 +685,7 @@ export default {
         const data = await getIncomes(yearId)
         this.incomes = Array.isArray(data) ? data : []
       } catch (e) {
-        this.incomeError = 'Einnahmen konnten nicht geladen werden.'
+        this.incomeError = this.t('loadIncomeError')
       }
     },
     async loadExpenses(yearId) {
@@ -691,7 +694,7 @@ export default {
         const data = await getExpenses(yearId)
         this.expenses = Array.isArray(data) ? data : []
       } catch (e) {
-        this.expenseError = 'Ausgaben konnten nicht geladen werden.'
+        this.expenseError = this.t('loadExpensesError')
       }
     },
     openCreateModal() {
@@ -792,32 +795,32 @@ export default {
     },
     async saveExpense() {
       if (!this.selectedYearId) {
-        this.expenseError = 'Bitte ein Wirtschaftsjahr auswählen.'
+        this.expenseError = this.t('selectFiscalYearError')
         return
       }
       if (!this.canSaveExpense) {
         this.expenseFieldErrors = {}
         if (!this.expenseForm.name.trim()) {
-          this.expenseFieldErrors.name = 'Bitte einen Namen angeben.'
+          this.expenseFieldErrors.name = this.t('nameError')
         }
         if (!this.expenseForm.bookedAt) {
-          this.expenseFieldErrors.bookedAt = 'Bitte ein Datum angeben.'
+          this.expenseFieldErrors.bookedAt = this.t('dateError')
         }
         if (this.expenseForm.amount === '') {
-          this.expenseFieldErrors.amount = 'Bitte einen Betrag angeben.'
+          this.expenseFieldErrors.amount = this.t('amountError')
         }
         return
       }
 
       const bookedAt = toTimestamp(this.expenseForm.bookedAt)
       if (bookedAt === null) {
-        this.expenseFieldErrors = { bookedAt: 'Bitte ein gültiges Datum angeben.' }
+        this.expenseFieldErrors = { bookedAt: this.t('dateValidError') }
         return
       }
 
       const amount = parseMoneyInput(this.expenseForm.amount)
       if (amount === null) {
-        this.expenseFieldErrors = { amount: 'Bitte einen gültigen Betrag angeben.' }
+        this.expenseFieldErrors = { amount: this.t('amountValidError') }
         return
       }
 
@@ -848,39 +851,39 @@ export default {
         }, 2000)
         this.closeExpenseModal()
       } catch (e) {
-        this.expenseError = 'Ausgabe konnte nicht gespeichert werden.'
+        this.expenseError = this.t('saveExpenseError')
       } finally {
         this.savingExpense = false
       }
     },
     async saveIncome() {
       if (!this.selectedYearId) {
-        this.incomeError = 'Bitte ein Wirtschaftsjahr auswählen.'
+        this.incomeError = this.t('selectFiscalYearError')
         return
       }
       if (!this.canSaveIncome) {
         this.incomeFieldErrors = {}
         if (!this.incomeForm.name.trim()) {
-          this.incomeFieldErrors.name = 'Bitte einen Namen angeben.'
+          this.incomeFieldErrors.name = this.t('nameError')
         }
         if (!this.incomeForm.bookedAt) {
-          this.incomeFieldErrors.bookedAt = 'Bitte ein Datum angeben.'
+          this.incomeFieldErrors.bookedAt = this.t('dateError')
         }
         if (this.incomeForm.amount === '') {
-          this.incomeFieldErrors.amount = 'Bitte einen Betrag angeben.'
+          this.incomeFieldErrors.amount = this.t('amountError')
         }
         return
       }
 
       const bookedAt = toTimestamp(this.incomeForm.bookedAt)
       if (bookedAt === null) {
-        this.incomeFieldErrors = { bookedAt: 'Bitte ein gültiges Datum angeben.' }
+        this.incomeFieldErrors = { bookedAt: this.t('dateValidError') }
         return
       }
 
       const amount = parseMoneyInput(this.incomeForm.amount)
       if (amount === null) {
-        this.incomeFieldErrors = { amount: 'Bitte einen gültigen Betrag angeben.' }
+        this.incomeFieldErrors = { amount: this.t('amountValidError') }
         return
       }
 
@@ -912,34 +915,34 @@ export default {
         }, 2000)
         this.closeIncomeModal()
       } catch (e) {
-        this.incomeError = 'Einnahme konnte nicht gespeichert werden.'
+        this.incomeError = this.t('saveIncomeError')
       } finally {
         this.savingIncome = false
       }
     },
     async removeExpense(expense) {
-      if (!window.confirm('Ausgabe wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteExpenseConfirm'))) {
         return
       }
       try {
         await deleteExpense(expense.id)
         this.expenses = this.expenses.filter((item) => item.id !== expense.id)
       } catch (e) {
-        this.expenseError = 'Ausgabe konnte nicht gelöscht werden.'
+        this.expenseError = this.t('deleteExpenseError')
       }
     },
     async removeIncome(income) {
       if (income.invoiceId) {
         return
       }
-      if (!window.confirm('Einnahme wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteIncomeConfirm'))) {
         return
       }
       try {
         await deleteIncome(income.id)
         this.incomes = this.incomes.filter((item) => item.id !== income.id)
       } catch (e) {
-        this.incomeError = 'Einnahme konnte nicht gelöscht werden.'
+        this.incomeError = this.t('deleteIncomeError')
       }
     },
     async markIncomePaid(income) {
@@ -976,16 +979,16 @@ export default {
           item.id === income.id ? { ...item, status: 'paid' } : item
         )
       } catch (e) {
-        this.incomeError = 'Status konnte nicht aktualisiert werden.'
+        this.incomeError = this.t('statusUpdateError')
       }
     },
     async save() {
       this.yearFieldErrors = {}
       if (!this.canSave) {
         this.yearFieldErrors = {
-          name: this.form.name.trim() ? '' : 'Bitte einen Namen angeben.',
-          dateStart: this.form.dateStart ? '' : 'Bitte ein Startdatum angeben.',
-          dateEnd: this.form.dateEnd ? '' : 'Bitte ein Enddatum angeben.',
+          name: this.form.name.trim() ? '' : this.t('nameError'),
+          dateStart: this.form.dateStart ? '' : this.t('startDateError'),
+          dateEnd: this.form.dateEnd ? '' : this.t('endDateError'),
         }
         return
       }
@@ -994,14 +997,14 @@ export default {
       const end = toTimestamp(this.form.dateEnd)
 
       if (start === null || end === null) {
-        this.error = 'Bitte gültige Datumswerte angeben.'
+        this.error = this.t('dateValuesError')
         return
       }
 
       if (start > end) {
         this.yearFieldErrors = {
-          dateStart: 'Startdatum muss vor Enddatum liegen.',
-          dateEnd: 'Enddatum muss nach Startdatum liegen.',
+          dateStart: this.t('startBeforeEndError'),
+          dateEnd: this.t('endAfterStartError'),
         }
         return
       }
@@ -1039,13 +1042,13 @@ export default {
         }, 2000)
         this.closeModal()
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }
     },
     async removeItem(item) {
-      if (!window.confirm('Wirtschaftsjahr wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteFiscalYearConfirm'))) {
         return
       }
       this.saving = true
@@ -1069,7 +1072,7 @@ export default {
           }
         }
       } catch (e) {
-        this.error = 'Löschen fehlgeschlagen.'
+        this.error = this.t('deleteError')
       } finally {
         this.saving = false
       }
@@ -1115,10 +1118,10 @@ export default {
     },
     incomeStatusLabel(status) {
       if (status === 'paid') {
-        return 'Bezahlt'
+        return this.t('paid')
       }
       if (status === 'open') {
-        return 'Offen'
+        return this.t('openStatus')
       }
       return status || '–'
     },

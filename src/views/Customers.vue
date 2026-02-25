@@ -2,11 +2,11 @@
   <section class="customers">
     <div class="header">
       <div>
-        <h1>Kunden</h1>
-        <p class="subline">Übersicht der Kunden.</p>
+        <h1>{{ t('title') }}</h1>
+        <p class="subline">{{ t('subline') }}</p>
       </div>
       <NcButton type="primary" @click="openCreateModal">
-        Neuer Kunde
+        {{ t('newCustomer') }}
       </NcButton>
     </div>
 
@@ -16,8 +16,8 @@
       <div class="filters">
         <div class="filter-group">
           <NcTextField
-            label="Suche"
-            placeholder="Name, Ansprechpartner, Ort, E-Mail…"
+            :label="t('searchLabel')"
+            :placeholder="t('searchPlaceholder')"
             :value.sync="query"
           />
         </div>
@@ -25,18 +25,18 @@
 
       <NcEmptyContent
         v-if="filteredItems.length === 0"
-        name="Noch keine Kunden"
-        description="Lege deine ersten Kunden an."
+        :name="t('emptyName')"
+        :description="t('emptyDescription')"
       />
 
       <table v-else class="table">
         <thead>
           <tr>
-            <th>Firma</th>
-            <th>Ansprechpartner</th>
-            <th>Ort</th>
-            <th>E-Mail</th>
-            <th class="actions">Aktionen</th>
+            <th>{{ t('company') }}</th>
+            <th>{{ t('contact') }}</th>
+            <th>{{ t('city') }}</th>
+            <th>{{ t('email') }}</th>
+            <th class="actions">{{ t('actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -48,8 +48,8 @@
             <td class="actions">
               <NcButton
                 type="tertiary-no-background"
-                aria-label="Kunde bearbeiten"
-                title="Bearbeiten"
+                :aria-label="t('editCustomer')"
+                :title="t('edit')"
                 @click="editItem(item)"
               >
                 <template #icon>
@@ -58,8 +58,8 @@
               </NcButton>
               <NcButton
                 type="tertiary-no-background"
-                aria-label="Kunde löschen"
-                title="Löschen"
+                :aria-label="t('deleteCustomer')"
+                :title="t('delete')"
                 @click="removeItem(item)"
               >
                 <template #icon>
@@ -76,63 +76,63 @@
 
     <NcModal v-if="showModal" size="normal" @close="closeModal">
       <div class="modal__content">
-        <h2>{{ editingId ? 'Kunde bearbeiten' : 'Neuer Kunde' }}</h2>
+        <h2>{{ editingId ? t('editCustomerTitle') : t('newCustomerTitle') }}</h2>
 
         <div class="form-group">
-          <NcTextField label="Firma *" :value.sync="form.company" />
+          <NcTextField :label="t('companyRequired')" :value.sync="form.company" />
           <p v-if="fieldErrors.company" class="field-error">{{ fieldErrors.company }}</p>
         </div>
         <div class="form-group">
-          <NcTextField label="Ansprechpartner" :value.sync="form.contactName" />
+          <NcTextField :label="t('contact')" :value.sync="form.contactName" />
         </div>
         <div class="form-group">
-          <NcTextField label="Straße" :value.sync="form.street" />
+          <NcTextField :label="t('street')" :value.sync="form.street" />
         </div>
         <div class="form-group">
-          <NcTextField label="Hausnummer" :value.sync="form.houseNumber" />
+          <NcTextField :label="t('houseNumber')" :value.sync="form.houseNumber" />
         </div>
         <div class="form-group">
-          <NcTextField label="PLZ" :value.sync="form.zip" />
+          <NcTextField :label="t('zip')" :value.sync="form.zip" />
         </div>
         <div class="form-group">
-          <NcTextField label="Stadt" :value.sync="form.city" />
+          <NcTextField :label="t('city')" :value.sync="form.city" />
         </div>
         <div class="form-group">
-          <NcTextField label="E-Mail" :value.sync="form.email" />
+          <NcTextField :label="t('email')" :value.sync="form.email" />
           <p v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</p>
         </div>
         <div class="form-group">
-          <NcTextField label="Rechnungs-E-Mail" :value.sync="form.billingEmail" :label-outside="true" />
+          <NcTextField :label="t('billingEmail')" :value.sync="form.billingEmail" :label-outside="true" />
           <p v-if="fieldErrors.billingEmail" class="field-error">{{ fieldErrors.billingEmail }}</p>
         </div>
         <div class="form-group">
-          <p class="label">Rechnung versenden an</p>
+          <p class="label">{{ t('invoiceRecipientLabel') }}</p>
           <div class="recipient-switches">
             <NcCheckboxRadioSwitch
               type="switch"
               :checked="form.sendInvoiceToBillingEmail"
               @update:checked="updateRecipientFlag('sendInvoiceToBillingEmail', $event)"
             >
-              Rechnungs-E-Mail
+              {{ t('billingEmail') }}
             </NcCheckboxRadioSwitch>
             <NcCheckboxRadioSwitch
               type="switch"
               :checked="form.sendInvoiceToContactEmail"
               @update:checked="updateRecipientFlag('sendInvoiceToContactEmail', $event)"
             >
-              Ansprechpartner
+              {{ t('contact') }}
             </NcCheckboxRadioSwitch>
           </div>
-          <p class="hint">Standard: Rechnungs-E-Mail (wenn vorhanden), sonst Ansprechpartner.</p>
+          <p class="hint">{{ t('recipientHint') }}</p>
         </div>
 
         <div class="actions">
           <NcButton type="primary" :disabled="saving || !canSave" @click="save">
-            {{ editingId ? 'Aktualisieren' : 'Anlegen' }}
+            {{ editingId ? t('update') : t('create') }}
           </NcButton>
-          <NcButton type="secondary" @click="closeModal">Abbrechen</NcButton>
-          <span v-if="saving" class="hint">Speichere…</span>
-          <span v-if="saved" class="success">Gespeichert</span>
+          <NcButton type="secondary" @click="closeModal">{{ t('cancel') }}</NcButton>
+          <span v-if="saving" class="hint">{{ t('saving') }}</span>
+          <span v-if="saved" class="success">{{ t('saved') }}</span>
           <span v-if="error" class="error">{{ error }}</span>
         </div>
       </div>
@@ -237,6 +237,9 @@ export default {
     },
   },
   methods: {
+    t(key) {
+      return this.$tKey(`customers.${key}`, key)
+    },
     isValidEmail(value) {
       if (!value) {
         return true
@@ -259,7 +262,7 @@ export default {
         const data = await getCustomers()
         this.items = Array.isArray(data) ? data : []
       } catch (e) {
-        this.error = 'Kunden konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -326,16 +329,16 @@ export default {
     async save() {
       this.clearFieldErrors()
       if (!this.canSave) {
-        this.fieldErrors = { company: 'Bitte eine Firma angeben.' }
+        this.fieldErrors = { company: this.t('companyRequiredError') }
         return
       }
       if (!this.isValidEmail(this.form.email.trim())) {
-        this.fieldErrors = { email: 'Bitte eine gültige E-Mail-Adresse angeben.' }
+        this.fieldErrors = { email: this.t('emailError') }
         return
       }
       if (!this.isValidEmail(this.form.billingEmail.trim())) {
         this.fieldErrors = {
-          billingEmail: 'Bitte eine gültige Rechnungs-E-Mail-Adresse angeben.',
+          billingEmail: this.t('billingEmailError'),
         }
         return
       }
@@ -379,13 +382,13 @@ export default {
         }, 2000)
         this.closeModal()
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }
     },
     async removeItem(item) {
-      if (!window.confirm('Kunde wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteConfirm'))) {
         return
       }
       this.saving = true
@@ -400,7 +403,7 @@ export default {
           this.closeModal()
         }
       } catch (e) {
-        this.error = 'Löschen fehlgeschlagen.'
+        this.error = this.t('deleteError')
       } finally {
         this.saving = false
       }

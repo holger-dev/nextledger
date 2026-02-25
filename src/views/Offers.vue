@@ -2,10 +2,10 @@
   <section class="offers">
     <div class="header">
       <div>
-        <h1>Angebote</h1>
-        <p class="subline">Übersicht der Angebote.</p>
+        <h1>{{ t('title') }}</h1>
+        <p class="subline">{{ t('subline') }}</p>
       </div>
-      <NcButton type="primary" @click="openCreateView">Neues Angebot</NcButton>
+      <NcButton type="primary" @click="openCreateView">{{ t('newOffer') }}</NcButton>
     </div>
 
     <NcLoadingIcon v-if="loading" />
@@ -20,14 +20,14 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="true"
-            input-label="Kunde"
+            :input-label="t('customer')"
             :label-outside="true"
-            placeholder="Alle Kunden"
+            :placeholder="t('allCustomers')"
           />
         </div>
         <div class="filter-group">
           <NcTextField
-            label="Datum von"
+            :label="t('dateFrom')"
             type="text"
             placeholder="YYYY-MM-DD"
             :value.sync="filterDateFrom"
@@ -35,7 +35,7 @@
         </div>
         <div class="filter-group">
           <NcTextField
-            label="Datum bis"
+            :label="t('dateTo')"
             type="text"
             placeholder="YYYY-MM-DD"
             :value.sync="filterDateTo"
@@ -49,7 +49,7 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Sortierung"
+            :input-label="t('sorting')"
             :label-outside="true"
           />
         </div>
@@ -57,20 +57,20 @@
 
       <NcEmptyContent
         v-if="filteredOffers.length === 0"
-        name="Noch keine Angebote"
-        description="Erstelle dein erstes Angebot."
+        :name="t('emptyName')"
+        :description="t('emptyDescription')"
       />
 
       <table v-else class="table">
         <thead>
           <tr>
-            <th>Nummer</th>
-            <th>Kunde</th>
-            <th>Vorgang</th>
-            <th>Datum</th>
-            <th class="price">Gesamt</th>
-            <th>Status</th>
-            <th class="actions">Aktionen</th>
+            <th>{{ t('number') }}</th>
+            <th>{{ t('customer') }}</th>
+            <th>{{ t('case') }}</th>
+            <th>{{ t('date') }}</th>
+            <th class="price">{{ t('total') }}</th>
+            <th>{{ t('status') }}</th>
+            <th class="actions">{{ t('actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -89,8 +89,8 @@
               <td class="actions">
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Angebot bearbeiten"
-                  title="Bearbeiten"
+                :aria-label="t('editOffer')"
+                :title="t('edit')"
                   @click="openEditOffer(offer)"
                 >
                   <template #icon>
@@ -99,8 +99,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Angebot als PDF herunterladen"
-                  title="PDF herunterladen"
+                :aria-label="t('downloadPdfOffer')"
+                :title="t('downloadPdf')"
                   @click="downloadOfferPdf(offer)"
                 >
                   <template #icon>
@@ -109,8 +109,8 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
-                  aria-label="Angebot löschen"
-                  title="Löschen"
+                :aria-label="t('deleteOffer')"
+                :title="t('delete')"
                   @click="removeOffer(offer)"
                 >
                   <template #icon>
@@ -122,20 +122,20 @@
             <tr v-if="expandedId === offer.id" :key="`detail-${offer.id}`">
               <td colspan="7" class="detail">
                 <div class="detail-inner">
-                  <h3>Positionen</h3>
+                  <h3>{{ t('positions') }}</h3>
                   <NcEmptyContent
                     v-if="offerItems.length === 0"
-                    name="Keine Positionen"
-                    description="Dieses Angebot hat noch keine Positionen."
+                    :name="t('noPositions')"
+                    :description="t('noPositionsOfferDescription')"
                   />
                   <table v-else class="table compact">
                     <thead>
                       <tr>
-                        <th>Position</th>
-                        <th>Beschreibung</th>
-                        <th class="price">Menge</th>
-                        <th class="price">Einzel</th>
-                        <th class="price">Gesamt</th>
+                        <th>{{ t('position') }}</th>
+                        <th>{{ t('description') }}</th>
+                        <th class="price">{{ t('quantity') }}</th>
+                        <th class="price">{{ t('unit') }}</th>
+                        <th class="price">{{ t('total') }}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -211,16 +211,16 @@ export default {
     },
     customerFilterOptions() {
       return this.customers.map((customer) => ({
-        label: customer.company || 'Unbenannt',
+        label: customer.company || this.t('unnamed'),
         value: customer.id,
       }))
     },
     sortOptions() {
       return [
-        { label: 'Datum (neu zuerst)', value: 'date_desc' },
-        { label: 'Datum (alt zuerst)', value: 'date_asc' },
-        { label: 'Preis (hoch zuerst)', value: 'price_desc' },
-        { label: 'Preis (niedrig zuerst)', value: 'price_asc' },
+        { label: this.t('sortDateDesc'), value: 'date_desc' },
+        { label: this.t('sortDateAsc'), value: 'date_asc' },
+        { label: this.t('sortPriceDesc'), value: 'price_desc' },
+        { label: this.t('sortPriceAsc'), value: 'price_asc' },
       ]
     },
     filteredOffers() {
@@ -247,6 +247,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`offers.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -260,7 +263,7 @@ export default {
         this.customers = Array.isArray(customers) ? customers : []
         this.cases = Array.isArray(cases) ? cases : []
       } catch (e) {
-        this.error = 'Angebote konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -299,7 +302,7 @@ export default {
     },
     customerName(id) {
       const customer = this.customerMap.get(id)
-      return customer ? customer.company || 'Unbenannt' : '–'
+      return customer ? customer.company || this.t('unnamed') : '–'
     },
     caseName(id) {
       const item = this.caseMap.get(id)
@@ -307,8 +310,8 @@ export default {
         return '–'
       }
       return item.caseNumber
-        ? `${item.caseNumber} – ${item.name || 'Unbenannt'}`
-        : item.name || 'Unbenannt'
+        ? `${item.caseNumber} – ${item.name || this.t('unnamed')}`
+        : item.name || this.t('unnamed')
     },
     formatPrice(value) {
       if (value === null || value === undefined) {
@@ -338,19 +341,19 @@ export default {
         const data = await getOfferItems(offer.id)
         this.offerItems = Array.isArray(data) ? data : []
       } catch (e) {
-        this.itemsError = 'Positionen konnten nicht geladen werden.'
+        this.itemsError = this.t('itemsLoadError')
       }
     },
     async removeOffer(offer) {
       this.error = ''
       try {
-        if (!window.confirm('Angebot wirklich löschen?')) {
+        if (!window.confirm(this.t('deleteConfirm'))) {
           return
         }
         await deleteOffer(offer.id)
         await this.load()
       } catch (e) {
-        this.error = 'Angebot konnte nicht gelöscht werden.'
+        this.error = this.t('deleteError')
       }
     },
   },

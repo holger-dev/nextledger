@@ -359,6 +359,7 @@ class SettingsController extends ApiController {
         ?string $mode = null,
         ?string $fromEmail = null,
         ?string $replyToEmail = null,
+        ?array $companyMappings = null,
     ): JSONResponse {
         $params = $this->request->getParams();
         if ($mode === null) {
@@ -370,8 +371,14 @@ class SettingsController extends ApiController {
         if ($replyToEmail === null) {
             $replyToEmail = $params['replyToEmail'] ?? null;
         }
+        if ($companyMappings === null) {
+            $rawMappings = $params['companyMappings'] ?? null;
+            if (is_array($rawMappings)) {
+                $companyMappings = $rawMappings;
+            }
+        }
 
-        return new JSONResponse($this->emailSettingsService->saveSettings($mode, $fromEmail, $replyToEmail));
+        return new JSONResponse($this->emailSettingsService->saveSettings($mode, $fromEmail, $replyToEmail, $companyMappings));
     }
 
     private function getScopedSingleton(BaseMapper $mapper, string $entityClass, int $companyId): array {

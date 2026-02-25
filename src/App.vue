@@ -2,25 +2,25 @@
   <NcContent app-name="nextledger">
     <NcAppNavigation>
       <NcAppNavigationItem :to="{ name: 'cases' }" :name="casesNavName" />
-      <NcAppNavigationItem :to="{ name: 'invoices' }" name="Rechnungen" />
-      <NcAppNavigationItem :to="{ name: 'offers' }" name="Angebote" />
+      <NcAppNavigationItem :to="{ name: 'invoices' }" :name="t('invoices')" />
+      <NcAppNavigationItem :to="{ name: 'offers' }" :name="t('offers')" />
       <NcAppNavigationSpacer />
-      <NcAppNavigationItem :to="{ name: 'products' }" name="Produkte/DL" />
-      <NcAppNavigationItem :to="{ name: 'customers' }" name="Kunden" />
-      <NcAppNavigationItem :to="{ name: 'fiscal-year' }" name="Wirtschaftsjahr" />
+      <NcAppNavigationItem :to="{ name: 'products' }" :name="t('products')" />
+      <NcAppNavigationItem :to="{ name: 'customers' }" :name="t('customers')" />
+      <NcAppNavigationItem :to="{ name: 'fiscal-year' }" :name="t('fiscalYear')" />
 
       <NcAppNavigationSpacer />
-      <NcAppNavigationSettings name="Einstellungen">
-        <NcAppNavigationItem :to="{ name: 'settings-company' }" name="Firma" />
-        <NcAppNavigationItem :to="{ name: 'settings-texts' }" name="Texte" />
-        <NcAppNavigationItem :to="{ name: 'settings-tax' }" name="Steuer" />
-        <NcAppNavigationItem :to="{ name: 'settings-misc' }" name="Kontodaten" />
-        <NcAppNavigationItem :to="{ name: 'settings-documents' }" name="Dokumente" />
-        <NcAppNavigationItem :to="{ name: 'settings-email' }" name="E-Mailverhalten" />
+      <NcAppNavigationSettings :name="t('settings')">
+        <NcAppNavigationItem :to="{ name: 'settings-company' }" :name="t('company')" />
+        <NcAppNavigationItem :to="{ name: 'settings-texts' }" :name="t('texts')" />
+        <NcAppNavigationItem :to="{ name: 'settings-tax' }" :name="t('tax')" />
+        <NcAppNavigationItem :to="{ name: 'settings-misc' }" :name="t('banking')" />
+        <NcAppNavigationItem :to="{ name: 'settings-documents' }" :name="t('documents')" />
+        <NcAppNavigationItem :to="{ name: 'settings-email' }" :name="t('emailBehavior')" />
       </NcAppNavigationSettings>
 
       <NcAppNavigationSpacer />
-      <NcAppNavigationItem :to="{ name: 'settings-help' }" name="Hilfe" />
+      <NcAppNavigationItem :to="{ name: 'settings-help' }" :name="t('help')" />
     </NcAppNavigation>
 
     <NcAppContent>
@@ -60,9 +60,10 @@ export default {
   },
   computed: {
     casesNavName() {
+      const base = this.t('cases')
       return this.activeCompanyName
-        ? `Vorgänge · ${this.activeCompanyName}`
-        : 'Vorgänge'
+        ? `${base} · ${this.activeCompanyName}`
+        : base
     },
     viewKey() {
       return `${this.$route.fullPath}:${this.companyContextVersion}`
@@ -76,6 +77,9 @@ export default {
     window.removeEventListener('nextledger-company-changed', this.handleCompanyChanged)
   },
   methods: {
+    t(key) {
+      return this.$tKey(`app.${key}`, key)
+    },
     async handleCompanyChanged() {
       await this.loadCompanyContext()
       this.companyContextVersion += 1

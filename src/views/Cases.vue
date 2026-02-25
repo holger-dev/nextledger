@@ -2,10 +2,10 @@
   <section class="cases">
     <div v-if="!standalone" class="header">
       <div>
-        <h1>Vorgänge</h1>
-        <p class="subline">Kompakt, filterbar und pro Vorgang aufklappbar.</p>
+        <h1>{{ t('title') }}</h1>
+        <p class="subline">{{ t('subline') }}</p>
       </div>
-      <NcButton type="primary" @click="openCreateModal">Neuer Vorgang</NcButton>
+      <NcButton type="primary" @click="openCreateModal">{{ t('newCase') }}</NcButton>
     </div>
 
     <NcLoadingIcon v-if="loading" />
@@ -17,17 +17,16 @@
       :close-on-click-outside="false"
     >
       <div class="modal__content">
-        <h2>Einrichtung erforderlich</h2>
+        <h2>{{ t('setupRequiredTitle') }}</h2>
         <p class="hint">
-          Ohne Firmendaten und ein Wirtschaftsjahr kann nicht gearbeitet werden.
-          Bitte lege beides an, bevor du Vorgänge bearbeitest.
+          {{ t('setupRequiredHint') }}
         </p>
         <div class="setup-links">
           <NcButton type="primary" @click="goToCompanySettings">
-            Firmadaten anlegen
+            {{ t('createCompanyData') }}
           </NcButton>
           <NcButton type="secondary" @click="goToFiscalYear">
-            Wirtschaftsjahr anlegen
+            {{ t('createFiscalYear') }}
           </NcButton>
         </div>
       </div>
@@ -35,7 +34,7 @@
 
     <div v-else class="content">
       <div v-if="!standalone" class="filters">
-        <label for="customerFilter">Kunde</label>
+        <label for="customerFilter">{{ t('customer') }}</label>
         <NcSelect
           id="customerFilter"
           v-model="filterCustomerId"
@@ -43,16 +42,16 @@
           :reduce="(option) => option.value"
           :append-to-body="false"
           :clearable="true"
-          input-label="Kunde"
+          :input-label="t('customer')"
           :label-outside="true"
-          placeholder="Alle Kunden"
+          :placeholder="t('allCustomers')"
         />
       </div>
 
       <NcEmptyContent
         v-if="itemsToShow.length === 0"
-        name="Noch keine Vorgänge"
-        description="Lege deinen ersten Vorgang für einen Kunden an."
+        :name="t('emptyName')"
+        :description="t('emptyDescription')"
       />
 
       <div v-else class="case-list">
@@ -60,7 +59,7 @@
           <header class="case-header">
             <div>
               <div class="case-title-row">
-                <h2 class="case-title">{{ item.name || 'Unbenannt' }}</h2>
+                <h2 class="case-title">{{ item.name || t('unnamed') }}</h2>
                 <span v-if="item.caseNumber" class="case-id">{{ item.caseNumber }}</span>
               </div>
               <p class="case-meta">
@@ -70,12 +69,12 @@
             </div>
             <div class="case-actions">
               <NcButton v-if="!standalone" type="tertiary" @click="openCaseDetail(item)">
-                Öffnen
+                {{ t('open') }}
               </NcButton>
               <NcButton
                 type="tertiary-no-background"
-                aria-label="Vorgang bearbeiten"
-                title="Bearbeiten"
+                :aria-label="t('editCase')"
+                :title="t('edit')"
                 @click="openEditModal(item)"
               >
                 <template #icon>
@@ -84,8 +83,8 @@
               </NcButton>
               <NcButton
                 type="tertiary-no-background"
-                aria-label="Vorgang löschen"
-                title="Löschen"
+                :aria-label="t('deleteCase')"
+                :title="t('delete')"
                 @click="removeItem(item)"
               >
                 <template #icon>
@@ -98,19 +97,19 @@
           <div v-if="standalone" class="case-detail">
             <div class="detail-grid">
             <div>
-              <h3>Vorgangsdaten</h3>
+              <h3>{{ t('caseData') }}</h3>
                 <table class="detail-table">
                   <tbody>
                     <tr>
-                      <th>Vorgangs-ID</th>
+                      <th>{{ t('caseId') }}</th>
                       <td>{{ item.caseNumber || '–' }}</td>
                     </tr>
                     <tr>
-                      <th>Beschreibung</th>
+                      <th>{{ t('description') }}</th>
                       <td>{{ item.description || '–' }}</td>
                     </tr>
                     <tr>
-                      <th>Deck</th>
+                      <th>{{ t('deck') }}</th>
                       <td>
                         <a
                           v-if="item.deckLink"
@@ -119,14 +118,14 @@
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Link öffnen
+                          {{ t('openLink') }}
                           <OpenInNew :size="16" />
                         </a>
                         <span v-else>–</span>
                       </td>
                     </tr>
                     <tr>
-                      <th>Kollektiv</th>
+                      <th>{{ t('collective') }}</th>
                       <td>
                         <a
                           v-if="item.kollektivLink"
@@ -135,7 +134,7 @@
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Link öffnen
+                          {{ t('openLink') }}
                           <OpenInNew :size="16" />
                         </a>
                         <span v-else>–</span>
@@ -145,16 +144,16 @@
                 </table>
               </div>
               <div>
-                <h3>Aktionen</h3>
+                <h3>{{ t('actions') }}</h3>
                 <div class="detail-actions">
                   <NcButton type="primary" @click="openCreateElementModal(item)">
-                    Neue Korrespondenz/Notiz
+                    {{ t('newElement') }}
                   </NcButton>
                   <NcButton type="secondary" @click="openCreateInvoice(item)">
-                    Neue Rechnung
+                    {{ t('newInvoice') }}
                   </NcButton>
                   <NcButton type="secondary" @click="openCreateOffer(item)">
-                    Neues Angebot
+                    {{ t('newOffer') }}
                   </NcButton>
                 </div>
               </div>
@@ -165,17 +164,17 @@
             <div class="invoices">
               <div class="list-header">
                 <h3>
-                  Rechnungen
+                  {{ t('invoices') }}
                   <span class="section-meta">
-                    (Offen {{ invoiceOpenCount }}, Bezahlt {{ invoicePaidCount }}, Umsatz {{ formatPrice(invoiceRevenueCents) }})
+                    ({{ t('openStatus') }} {{ invoiceOpenCount }}, {{ t('paid') }} {{ invoicePaidCount }}, {{ t('revenue') }} {{ formatPrice(invoiceRevenueCents) }})
                   </span>
                 </h3>
                 <div class="list-actions">
                   <NcButton type="tertiary" @click="toggleInvoices">
-                    {{ showInvoices ? 'Schließen' : 'Öffnen' }}
+                    {{ showInvoices ? t('close') : t('open') }}
                   </NcButton>
                   <NcButton type="secondary" @click="openCreateInvoice(item)">
-                    Neue Rechnung
+                    {{ t('newInvoice') }}
                   </NcButton>
                 </div>
               </div>
@@ -186,12 +185,12 @@
                   :key="offer.id"
                   class="billing-summary__item"
                 >
-                  <h4>Auftrag {{ offer.number || 'Angebot' }}</h4>
-                  <p>Auftragssumme: {{ formatPrice(offer.totalCents) }}</p>
-                  <p>Bisher abgerechnet (Abschläge): {{ formatPrice(advanceTotal(offer.id)) }}</p>
-                  <p>Rest: {{ formatPrice(offerRemaining(offer)) }}</p>
+                  <h4>{{ t('order') }} {{ offer.number || t('offer') }}</h4>
+                  <p>{{ t('orderTotal') }}: {{ formatPrice(offer.totalCents) }}</p>
+                  <p>{{ t('alreadyBilledAdvances') }}: {{ formatPrice(advanceTotal(offer.id)) }}</p>
+                  <p>{{ t('remaining') }}: {{ formatPrice(offerRemaining(offer)) }}</p>
                   <div v-if="advanceInvoices(offer.id).length" class="billing-summary__list">
-                    <p><strong>Abschlagsrechnungen</strong></p>
+                    <p><strong>{{ t('advanceInvoices') }}</strong></p>
                     <ul>
                       <li v-for="invoice in advanceInvoices(offer.id)" :key="invoice.id">
                         {{ invoice.number || '–' }} • {{ formatDate(invoice.issueDate) }} •
@@ -204,18 +203,18 @@
 
               <NcEmptyContent
                 v-if="showInvoices && invoices.length === 0 && invoicesCaseId === item.id"
-                name="Keine Rechnungen"
-                description="Erstelle eine Rechnung für diesen Vorgang."
+                :name="t('noInvoices')"
+                :description="t('noInvoicesDescription')"
               />
 
               <table v-else-if="showInvoices" class="table">
                 <thead>
                   <tr>
-                    <th>Nummer</th>
-                    <th>Datum</th>
-                    <th class="price">Gesamt</th>
-                    <th>Status</th>
-                    <th class="actions">Aktionen</th>
+                    <th>{{ t('number') }}</th>
+                    <th>{{ t('date') }}</th>
+                    <th class="price">{{ t('total') }}</th>
+                    <th>{{ t('status') }}</th>
+                    <th class="actions">{{ t('actions') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,8 +226,8 @@
                     <td class="actions">
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Rechnung bearbeiten"
-                        title="Bearbeiten"
+                        :aria-label="t('editInvoice')"
+                        :title="t('edit')"
                         @click="openEditInvoice(invoice)"
                       >
                         <template #icon>
@@ -237,8 +236,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Rechnung verschicken"
-                        title="Verschicken"
+                        :aria-label="t('sendInvoice')"
+                        :title="t('send')"
                         @click="openSendInvoiceModal(invoice)"
                       >
                         <template #icon>
@@ -247,8 +246,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="PDF herunterladen"
-                        title="PDF herunterladen"
+                        :aria-label="t('downloadPdf')"
+                        :title="t('downloadPdf')"
                         @click="downloadInvoicePdf(invoice)"
                       >
                         <template #icon>
@@ -257,8 +256,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Rechnung als bezahlt markieren"
-                        title="Als bezahlt markieren"
+                        :aria-label="t('markInvoicePaid')"
+                        :title="t('markAsPaid')"
                         :disabled="invoice.status === 'paid'"
                         @click="markInvoicePaid(invoice)"
                       >
@@ -268,8 +267,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Rechnung löschen"
-                        title="Löschen"
+                        :aria-label="t('deleteInvoice')"
+                        :title="t('delete')"
                         @click="removeInvoice(invoice)"
                       >
                         <template #icon>
@@ -289,33 +288,33 @@
             <div class="offers">
               <div class="list-header">
                 <h3>
-                  Angebote
+                  {{ t('offers') }}
                   <span class="section-meta">({{ offers.length }})</span>
                 </h3>
                 <div class="list-actions">
                   <NcButton type="tertiary" @click="toggleOffers">
-                    {{ showOffers ? 'Schließen' : 'Öffnen' }}
+                    {{ showOffers ? t('close') : t('open') }}
                   </NcButton>
                   <NcButton type="secondary" @click="openCreateOffer(item)">
-                    Neues Angebot
+                    {{ t('newOffer') }}
                   </NcButton>
                 </div>
               </div>
 
               <NcEmptyContent
                 v-if="showOffers && offers.length === 0 && offersCaseId === item.id"
-                name="Keine Angebote"
-                description="Erstelle ein Angebot für diesen Vorgang."
+                :name="t('noOffers')"
+                :description="t('noOffersDescription')"
               />
 
               <table v-else-if="showOffers" class="table">
                 <thead>
                   <tr>
-                    <th>Nummer</th>
-                    <th>Datum</th>
-                    <th class="price">Gesamt</th>
-                    <th>Status</th>
-                    <th class="actions">Aktionen</th>
+                    <th>{{ t('number') }}</th>
+                    <th>{{ t('date') }}</th>
+                    <th class="price">{{ t('total') }}</th>
+                    <th>{{ t('status') }}</th>
+                    <th class="actions">{{ t('actions') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -327,8 +326,8 @@
                     <td class="actions">
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Angebot bearbeiten"
-                        title="Bearbeiten"
+                        :aria-label="t('editOffer')"
+                        :title="t('edit')"
                         @click="openEditOffer(offer)"
                       >
                         <template #icon>
@@ -337,8 +336,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Angebot senden"
-                        title="Senden"
+                        :aria-label="t('sendOffer')"
+                        :title="t('send')"
                         @click="openSendOfferModal(offer)"
                       >
                         <template #icon>
@@ -347,8 +346,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Angebot als PDF herunterladen"
-                        title="PDF herunterladen"
+                        :aria-label="t('downloadOfferPdf')"
+                        :title="t('downloadPdf')"
                         @click="downloadOfferPdf(offer)"
                       >
                         <template #icon>
@@ -357,8 +356,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Angebot löschen"
-                        title="Löschen"
+                        :aria-label="t('deleteOffer')"
+                        :title="t('delete')"
                         @click="removeOffer(offer)"
                       >
                         <template #icon>
@@ -378,32 +377,32 @@
             <div class="elements">
               <div class="list-header">
                 <h3>
-                  Korrespondenz/Notizen
+                  {{ t('elements') }}
                   <span class="section-meta">({{ elements.length }})</span>
                 </h3>
                 <div class="list-actions">
                   <NcButton type="tertiary" @click="toggleElements">
-                    {{ showElements ? 'Schließen' : 'Öffnen' }}
+                    {{ showElements ? t('close') : t('open') }}
                   </NcButton>
                   <NcButton type="secondary" @click="openCreateElementModal(item)">
-                    Neue Korrespondenz/Notiz
+                    {{ t('newElement') }}
                   </NcButton>
                 </div>
               </div>
 
               <NcEmptyContent
                 v-if="showElements && elements.length === 0 && elementsCaseId === item.id"
-                name="Keine Korrespondenz/Notizen"
-                description="Füge Korrespondenz/Notizen zu diesem Vorgang hinzu."
+                :name="t('noElements')"
+                :description="t('noElementsDescription')"
               />
 
               <table v-else-if="showElements" class="table">
                 <thead>
                   <tr>
-                    <th>Korrespondenz/Notiz</th>
-                    <th>Notiz</th>
-                    <th>Anhang</th>
-                    <th class="actions">Aktionen</th>
+                    <th>{{ t('element') }}</th>
+                    <th>{{ t('note') }}</th>
+                    <th>{{ t('attachment') }}</th>
+                    <th class="actions">{{ t('actions') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -414,8 +413,8 @@
                     <td class="actions">
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Korrespondenz/Notiz bearbeiten"
-                        title="Bearbeiten"
+                        :aria-label="t('editElement')"
+                        :title="t('edit')"
                         @click="openEditElementModal(item, element)"
                       >
                         <template #icon>
@@ -424,8 +423,8 @@
                       </NcButton>
                       <NcButton
                         type="tertiary-no-background"
-                        aria-label="Korrespondenz/Notiz löschen"
-                        title="Löschen"
+                        :aria-label="t('deleteElement')"
+                        :title="t('delete')"
                         @click="removeElement(element)"
                       >
                         <template #icon>
@@ -448,10 +447,10 @@
 
     <NcModal v-if="showCaseModal" size="normal" @close="closeCaseModal">
       <div class="modal__content">
-        <h2>{{ editingId ? 'Vorgang bearbeiten' : 'Neuer Vorgang' }}</h2>
+        <h2>{{ editingId ? t('editCaseTitle') : t('newCase') }}</h2>
 
         <div class="form-group">
-          <label for="caseCustomer">Kunde</label>
+          <label for="caseCustomer">{{ t('customer') }}</label>
           <NcSelect
             id="caseCustomer"
             v-model="form.customerId"
@@ -459,35 +458,35 @@
             :reduce="(option) => option.value"
             :append-to-body="false"
             :clearable="false"
-            input-label="Kunde"
+            :input-label="t('customer')"
             :label-outside="true"
-            placeholder="Bitte auswählen"
+            :placeholder="t('selectPlease')"
           />
           <span v-if="customers.length === 0" class="hint">
-            Lege zuerst einen Kunden an.
+            {{ t('createCustomerFirst') }}
           </span>
         </div>
 
         <div class="form-group">
-          <NcTextField label="Name" :value.sync="form.name" />
+          <NcTextField :label="t('name')" :value.sync="form.name" />
         </div>
         <div class="form-group">
-          <NcTextArea label="Beschreibung" :value.sync="form.description" />
+          <NcTextArea :label="t('description')" :value.sync="form.description" />
         </div>
         <div class="form-group">
-          <NcTextField label="Nextcloud Deck Link" :value.sync="form.deckLink" />
+          <NcTextField :label="t('deckLink')" :value.sync="form.deckLink" />
         </div>
         <div class="form-group">
-          <NcTextField label="Nextcloud Kollektiv Link" :value.sync="form.kollektivLink" />
+          <NcTextField :label="t('collectiveLink')" :value.sync="form.kollektivLink" />
         </div>
 
         <div class="actions">
           <NcButton type="primary" :disabled="saving || !canSave" @click="save">
-            {{ editingId ? 'Aktualisieren' : 'Anlegen' }}
+            {{ editingId ? t('update') : t('create') }}
           </NcButton>
-          <NcButton type="secondary" @click="closeCaseModal">Abbrechen</NcButton>
-          <span v-if="saving" class="hint">Speichere…</span>
-          <span v-if="saved" class="success">Gespeichert</span>
+          <NcButton type="secondary" @click="closeCaseModal">{{ t('cancel') }}</NcButton>
+          <span v-if="saving" class="hint">{{ t('saving') }}</span>
+          <span v-if="saved" class="success">{{ t('saved') }}</span>
           <span v-if="error" class="error">{{ error }}</span>
         </div>
       </div>
@@ -495,30 +494,30 @@
 
     <NcModal v-if="showElementModal" size="normal" @close="closeElementModal">
       <div class="modal__content">
-        <h2>{{ editingElementId ? 'Korrespondenz/Notiz bearbeiten' : 'Neue Korrespondenz/Notiz' }}</h2>
-        <p class="subline">Für Vorgang: {{ elementCaseName }}</p>
+        <h2>{{ editingElementId ? t('editElementTitle') : t('newElement') }}</h2>
+        <p class="subline">{{ t('forCase') }}: {{ elementCaseName }}</p>
 
         <div class="form-group">
-          <NcTextField label="Name" :value.sync="elementForm.name" />
+          <NcTextField :label="t('name')" :value.sync="elementForm.name" />
         </div>
         <div class="form-group">
-          <NcTextArea label="Notiz" :value.sync="elementForm.note" />
+          <NcTextArea :label="t('note')" :value.sync="elementForm.note" />
         </div>
         <div class="form-group">
-          <NcTextField label="Anhang" :value.sync="elementForm.attachmentPath" />
+          <NcTextField :label="t('attachment')" :value.sync="elementForm.attachmentPath" />
           <div class="attachment-actions">
             <NcButton type="secondary" @click="openFilePicker">
-              Aus Dateien wählen
+              {{ t('pickFromFiles') }}
             </NcButton>
             <NcButton type="secondary" @click="triggerUpload">
-              Datei hochladen
+              {{ t('uploadFile') }}
             </NcButton>
             <NcButton
               v-if="elementForm.attachmentPath"
               type="tertiary-no-background"
               @click="clearAttachment"
             >
-              Entfernen
+              {{ t('remove') }}
             </NcButton>
             <input
               ref="attachmentInput"
@@ -535,11 +534,11 @@
             :disabled="savingElement || !canSaveElement"
             @click="saveElement"
           >
-            {{ editingElementId ? 'Aktualisieren' : 'Anlegen' }}
+            {{ editingElementId ? t('update') : t('create') }}
           </NcButton>
-          <NcButton type="secondary" @click="closeElementModal">Abbrechen</NcButton>
-          <span v-if="savingElement" class="hint">Speichere…</span>
-          <span v-if="savedElement" class="success">Gespeichert</span>
+          <NcButton type="secondary" @click="closeElementModal">{{ t('cancel') }}</NcButton>
+          <span v-if="savingElement" class="hint">{{ t('saving') }}</span>
+          <span v-if="savedElement" class="success">{{ t('saved') }}</span>
           <span v-if="elementError" class="error">{{ elementError }}</span>
         </div>
       </div>
@@ -547,15 +546,15 @@
 
     <NcModal v-if="showSendOfferModal" size="normal" @close="closeSendOfferModal">
       <div class="modal__content">
-        <h2>Angebot verschicken</h2>
+        <h2>{{ t('sendOfferTitle') }}</h2>
         <template v-if="isDirectEmail">
-          <p>Die E-Mail wird direkt über den SMTP-Server versendet.</p>
+          <p>{{ directDeliveryHint }}</p>
           <div class="email-preview">
-            <p><strong>Empfänger:</strong> {{ sendOfferPreview?.to?.join(', ') || '–' }}</p>
-            <p v-if="effectiveFromEmail"><strong>Absender:</strong> {{ effectiveFromEmail }}</p>
-            <p v-if="effectiveReplyToEmail"><strong>Antwort an:</strong> {{ effectiveReplyToEmail }}</p>
-            <p><strong>Betreff:</strong> {{ sendOfferPreview?.subject || '–' }}</p>
-            <p><strong>Anhang:</strong> {{ sendOfferPreview?.attachmentName || '–' }}</p>
+            <p><strong>{{ t('recipient') }}:</strong> {{ sendOfferPreview?.to?.join(', ') || '–' }}</p>
+            <p v-if="effectiveFromEmail"><strong>{{ t('sender') }}:</strong> {{ effectiveFromEmail }}</p>
+            <p v-if="effectiveReplyToEmail"><strong>{{ t('replyTo') }}:</strong> {{ effectiveReplyToEmail }}</p>
+            <p><strong>{{ t('subject') }}:</strong> {{ sendOfferPreview?.subject || '–' }}</p>
+            <p><strong>{{ t('attachment') }}:</strong> {{ sendOfferPreview?.attachmentName || '–' }}</p>
             <pre class="email-body">{{ sendOfferPreview?.body || '' }}</pre>
           </div>
           <div class="actions">
@@ -564,20 +563,20 @@
               :disabled="!canSendOfferEmail || sendingOffer"
               @click="sendOfferDirect"
             >
-              E-Mail senden
+              {{ t('sendEmail') }}
             </NcButton>
-            <NcButton type="secondary" @click="closeSendOfferModal">Abbrechen</NcButton>
-            <span v-if="sendingOffer" class="hint">Sende…</span>
-            <span v-if="sentOfferEmail" class="success">Gesendet</span>
+            <NcButton type="secondary" @click="closeSendOfferModal">{{ t('cancel') }}</NcButton>
+            <span v-if="sendingOffer" class="hint">{{ t('sending') }}</span>
+            <span v-if="sentOfferEmail" class="success">{{ t('sent') }}</span>
             <span v-if="sendOfferError" class="error">{{ sendOfferError }}</span>
           </div>
         </template>
         <template v-else>
           <p>
-            Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
+            {{ t('pdfDownloadedHint') }}
           </p>
           <p>
-            Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
+            {{ t('templateOpensHint') }}
           </p>
           <div class="actions">
             <NcButton
@@ -585,12 +584,12 @@
               :disabled="!canSendOfferEmail"
               @click="openOfferMailto"
             >
-              Mailvorlage erstellen
+              {{ t('createMailTemplate') }}
             </NcButton>
-            <NcButton type="secondary" @click="closeSendOfferModal">Schließen</NcButton>
+            <NcButton type="secondary" @click="closeSendOfferModal">{{ t('close') }}</NcButton>
           </div>
           <p class="hint">
-            Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
+            {{ t('manualAttachmentHint') }}
           </p>
         </template>
       </div>
@@ -598,15 +597,15 @@
 
     <NcModal v-if="showSendInvoiceModal" size="normal" @close="closeSendInvoiceModal">
       <div class="modal__content">
-        <h2>Rechnung verschicken</h2>
+        <h2>{{ t('sendInvoiceTitle') }}</h2>
         <template v-if="isDirectEmail">
-          <p>Die E-Mail wird direkt über den SMTP-Server versendet.</p>
+          <p>{{ directDeliveryHint }}</p>
           <div class="email-preview">
-            <p><strong>Empfänger:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
-            <p v-if="effectiveFromEmail"><strong>Absender:</strong> {{ effectiveFromEmail }}</p>
-            <p v-if="effectiveReplyToEmail"><strong>Antwort an:</strong> {{ effectiveReplyToEmail }}</p>
-            <p><strong>Betreff:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
-            <p><strong>Anhang:</strong> {{ sendInvoicePreview?.attachmentName || '–' }}</p>
+            <p><strong>{{ t('recipient') }}:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
+            <p v-if="effectiveFromEmail"><strong>{{ t('sender') }}:</strong> {{ effectiveFromEmail }}</p>
+            <p v-if="effectiveReplyToEmail"><strong>{{ t('replyTo') }}:</strong> {{ effectiveReplyToEmail }}</p>
+            <p><strong>{{ t('subject') }}:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
+            <p><strong>{{ t('attachment') }}:</strong> {{ sendInvoicePreview?.attachmentName || '–' }}</p>
             <pre class="email-body">{{ sendInvoicePreview?.body || '' }}</pre>
           </div>
           <div class="actions">
@@ -615,20 +614,20 @@
               :disabled="!canSendInvoiceEmail || sendingInvoice"
               @click="sendInvoiceDirect"
             >
-              E-Mail senden
+              {{ t('sendEmail') }}
             </NcButton>
-            <NcButton type="secondary" @click="closeSendInvoiceModal">Abbrechen</NcButton>
-            <span v-if="sendingInvoice" class="hint">Sende…</span>
-            <span v-if="sentInvoiceEmail" class="success">Gesendet</span>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">{{ t('cancel') }}</NcButton>
+            <span v-if="sendingInvoice" class="hint">{{ t('sending') }}</span>
+            <span v-if="sentInvoiceEmail" class="success">{{ t('sent') }}</span>
             <span v-if="sendInvoiceError" class="error">{{ sendInvoiceError }}</span>
           </div>
         </template>
         <template v-else>
           <p>
-            Das PDF wurde heruntergeladen. Bitte füge es als Anhang in deine E-Mail ein.
+            {{ t('pdfDownloadedHint') }}
           </p>
           <p>
-            Mit dem Button wird eine Mailvorlage geöffnet (Betreff + Text).
+            {{ t('templateOpensHint') }}
           </p>
           <div class="actions">
             <NcButton
@@ -636,12 +635,12 @@
               :disabled="!canSendInvoiceEmail"
               @click="openInvoiceMailto"
             >
-              Mailvorlage erstellen
+              {{ t('createMailTemplate') }}
             </NcButton>
-            <NcButton type="secondary" @click="closeSendInvoiceModal">Schließen</NcButton>
+            <NcButton type="secondary" @click="closeSendInvoiceModal">{{ t('close') }}</NcButton>
           </div>
           <p class="hint">
-            Hinweis: Das PDF muss manuell als Anhang hinzugefügt werden.
+            {{ t('manualAttachmentHint') }}
           </p>
         </template>
       </div>
@@ -799,25 +798,30 @@ export default {
       return !!this.sendInvoiceMailto
     },
     isDirectEmail() {
-      return this.emailBehavior?.mode === 'direct'
+      const mode = this.emailBehavior?.mode
+      return mode === 'direct' || mode === 'admin_smtp' || mode === 'nextcloud_mail'
+    },
+    directDeliveryHint() {
+      if (this.emailBehavior?.mode === 'nextcloud_mail') {
+        return this.t('directDeliveryMailHint')
+      }
+      return this.t('directDeliveryAdminHint')
     },
     effectiveFromEmail() {
-      const stored = (this.emailBehavior?.fromEmail || '').trim()
-      return stored || this.emailBehavior?.defaultFromEmail || ''
+      return (this.emailBehavior?.effectiveFromEmail || '').trim()
     },
     effectiveReplyToEmail() {
-      const stored = (this.emailBehavior?.replyToEmail || '').trim()
-      return stored || this.emailBehavior?.defaultReplyToEmail || ''
+      return (this.emailBehavior?.effectiveReplyToEmail || '').trim()
     },
     customerOptions() {
       return this.customers.map((customer) => ({
-        label: customer.company || 'Unbenannt',
+        label: customer.company || this.t('unnamed'),
         value: String(customer.id),
       }))
     },
     customerFilterOptions() {
       return [
-        { label: 'Alle Kunden', value: '' },
+        { label: this.t('allCustomers'), value: '' },
         ...this.customerOptions,
       ]
     },
@@ -867,6 +871,9 @@ export default {
     }
   },
   methods: {
+    t(key) {
+      return this.$tKey(`cases.${key}`, key)
+    },
     async applyStandaloneFocus() {
       if (!this.focusCaseId) {
         return
@@ -938,7 +945,7 @@ export default {
         this.emailBehavior = emailBehavior || { mode: 'manual' }
         this.updateSetupState(company, fiscalYears)
       } catch (e) {
-        this.error = 'Vorgänge konnten nicht geladen werden.'
+        this.error = this.t('loadCasesError')
       } finally {
         this.loading = false
       }
@@ -960,7 +967,7 @@ export default {
           this.offersCaseId = null
         }
       } catch (e) {
-        this.error = 'Vorgänge konnten nicht geladen werden.'
+        this.error = this.t('loadCasesError')
       } finally {
         this.loading = false
       }
@@ -972,7 +979,7 @@ export default {
         const data = await getCaseElements(caseId)
         this.elements = Array.isArray(data) ? data : []
       } catch (e) {
-        this.elementError = 'Korrespondenz/Notizen konnten nicht geladen werden.'
+        this.elementError = this.t('loadElementsError')
       }
     },
     async loadInvoices(caseId) {
@@ -985,7 +992,7 @@ export default {
           (a, b) => (a.issueDate || 0) - (b.issueDate || 0)
         )
       } catch (e) {
-        this.invoicesError = 'Rechnungen konnten nicht geladen werden.'
+        this.invoicesError = this.t('loadInvoicesError')
       }
     },
     async loadOffers(caseId) {
@@ -998,7 +1005,7 @@ export default {
           (a, b) => (a.issueDate || 0) - (b.issueDate || 0)
         )
       } catch (e) {
-        this.offersError = 'Angebote konnten nicht geladen werden.'
+        this.offersError = this.t('loadOffersError')
       }
     },
     async markOfferSent(offer) {
@@ -1024,7 +1031,7 @@ export default {
           item.id === offer.id ? saved : item
         )
       } catch (e) {
-        this.offersError = 'Status konnte nicht aktualisiert werden.'
+        this.offersError = this.t('statusUpdateError')
       }
     },
     resetForm() {
@@ -1113,18 +1120,18 @@ export default {
           item.id === invoice.id ? saved : item
         )
       } catch (e) {
-        this.invoicesError = 'Status konnte nicht aktualisiert werden.'
+        this.invoicesError = this.t('statusUpdateError')
       }
     },
     async removeInvoice(invoice) {
-      if (!window.confirm('Rechnung wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteInvoiceConfirm'))) {
         return
       }
       try {
         await deleteInvoice(invoice.id)
         this.invoices = this.invoices.filter((item) => item.id !== invoice.id)
       } catch (e) {
-        this.invoicesError = 'Rechnung konnte nicht gelöscht werden.'
+        this.invoicesError = this.t('deleteInvoiceError')
       }
     },
     downloadInvoicePdf(invoice) {
@@ -1211,7 +1218,9 @@ export default {
       const customer = this.customers.find((entry) => entry.id === offer.customerId)
       const caseItem = this.items.find((entry) => entry.id === offer.caseId)
       const contact = (customer?.contactName || '').trim()
-      const salutation = contact ? `Hallo ${contact}` : 'Sehr geehrte Damen und Herren'
+      const salutation = contact
+        ? this.t('salutationContact').replace('{name}', contact)
+        : this.t('salutationDefault')
       const context = {
         offerNumber: offer.number || '',
         customerName: customer?.company || '',
@@ -1224,10 +1233,10 @@ export default {
           : '',
       }
 
-      const subjectTemplate = this.texts?.offerEmailSubject || 'Angebot {{offerNumber}}'
+      const subjectTemplate = this.texts?.offerEmailSubject || this.t('offerSubjectDefault')
       const bodyTemplate =
         this.texts?.offerEmailBody ||
-        '{{customerSalutation}},\n\nanbei das Angebot {{offerNumber}}.\n\nViele Grüße'
+        this.t('offerBodyDefault')
 
       const to = customer?.email ? [customer.email] : []
       return {
@@ -1258,7 +1267,7 @@ export default {
           this.closeSendOfferModal()
         }, 700)
       } catch (e) {
-        this.sendOfferError = 'E-Mail konnte nicht gesendet werden.'
+        this.sendOfferError = this.t('sendEmailError')
       } finally {
         this.sendingOffer = false
       }
@@ -1274,7 +1283,9 @@ export default {
       const customer = this.customers.find((entry) => entry.id === invoice.customerId)
       const caseItem = this.items.find((entry) => entry.id === invoice.caseId)
       const contact = (customer?.contactName || '').trim()
-      const salutation = contact ? `Hallo ${contact}` : 'Sehr geehrte Damen und Herren'
+      const salutation = contact
+        ? this.t('salutationContact').replace('{name}', contact)
+        : this.t('salutationDefault')
       const context = {
         invoiceNumber: invoice.number || '',
         customerName: customer?.company || '',
@@ -1287,10 +1298,10 @@ export default {
           : '',
       }
 
-      const subjectTemplate = this.texts?.invoiceEmailSubject || 'Rechnung {{invoiceNumber}}'
+      const subjectTemplate = this.texts?.invoiceEmailSubject || this.t('invoiceSubjectDefault')
       const bodyTemplate =
         this.texts?.invoiceEmailBody ||
-        '{{customerSalutation}},\n\nanbei die Rechnung {{invoiceNumber}}.\n\nViele Grüße'
+        this.t('invoiceBodyDefault')
 
       const recipients = this.buildInvoiceRecipients(caseItem, customer)
       return {
@@ -1321,7 +1332,7 @@ export default {
           this.closeSendInvoiceModal()
         }, 700)
       } catch (e) {
-        this.sendInvoiceError = 'E-Mail konnte nicht gesendet werden.'
+        this.sendInvoiceError = this.t('sendEmailError')
       } finally {
         this.sendingInvoice = false
       }
@@ -1368,14 +1379,14 @@ export default {
       )
     },
     async removeOffer(offer) {
-      if (!window.confirm('Angebot wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteOfferConfirm'))) {
         return
       }
       try {
         await deleteOffer(offer.id)
         await this.loadOffers(offer.caseId)
       } catch (e) {
-        this.offersError = 'Angebot konnte nicht gelöscht werden.'
+        this.offersError = this.t('deleteOfferError')
       }
     },
     openEditModal(item) {
@@ -1397,7 +1408,7 @@ export default {
     },
     async save() {
       if (!this.canSave) {
-        this.error = 'Bitte Kunde und Name angeben.'
+        this.error = this.t('caseNameCustomerError')
         return
       }
 
@@ -1435,13 +1446,13 @@ export default {
         }, 2000)
         this.closeCaseModal()
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }
     },
     async removeItem(item) {
-      if (!window.confirm('Vorgang wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteCaseConfirm'))) {
         return
       }
       this.saving = true
@@ -1459,7 +1470,7 @@ export default {
           this.offersCaseId = null
         }
       } catch (e) {
-        this.error = 'Löschen fehlgeschlagen.'
+        this.error = this.t('deleteError')
       } finally {
         this.saving = false
       }
@@ -1501,10 +1512,10 @@ export default {
     },
     invoiceStatusLabel(status) {
       if (status === 'paid') {
-        return 'Bezahlt'
+        return this.t('paid')
       }
       if (status === 'open') {
-        return 'Offen'
+        return this.t('openStatus')
       }
       return status || '–'
     },
@@ -1546,7 +1557,7 @@ export default {
       }
       this.elementError = ''
       this.elementsCaseId = item.id
-      this.elementCaseName = item.name || 'Unbenannt'
+      this.elementCaseName = item.name || this.t('unnamed')
       this.showElementModal = true
       if (this.expandedId !== item.id) {
         this.expandedId = item.id
@@ -1573,7 +1584,7 @@ export default {
       }
       this.elementError = ''
       this.elementsCaseId = item.id
-      this.elementCaseName = item.name || 'Unbenannt'
+      this.elementCaseName = item.name || this.t('unnamed')
       this.showElementModal = true
     },
     closeElementModal() {
@@ -1587,11 +1598,11 @@ export default {
     },
     async saveElement() {
       if (!this.elementsCaseId) {
-        this.elementError = 'Bitte zuerst einen Vorgang auswählen.'
+        this.elementError = this.t('selectCaseFirstError')
         return
       }
       if (!this.canSaveElement) {
-        this.elementError = 'Bitte einen Namen angeben.'
+        this.elementError = this.t('nameRequiredError')
         return
       }
 
@@ -1622,7 +1633,7 @@ export default {
         }, 2000)
         this.closeElementModal()
       } catch (e) {
-        this.elementError = 'Speichern fehlgeschlagen.'
+        this.elementError = this.t('saveError')
       } finally {
         this.savingElement = false
       }
@@ -1641,11 +1652,11 @@ export default {
 
       const legacyPicker = window?.OC?.dialogs?.filepicker
       if (legacyPicker) {
-        legacyPicker('Datei auswählen', handlePicked, false, null, false)
+        legacyPicker(this.t('selectFile'), handlePicked, false, null, false)
         return
       }
 
-      const picker = getFilePickerBuilder('Datei auswählen')
+      const picker = getFilePickerBuilder(this.t('selectFile'))
         .setMultiSelect(false)
         .build()
 
@@ -1668,9 +1679,9 @@ export default {
       try {
         const path = await this.uploadToNextcloud(file)
         this.elementForm.attachmentPath = path
-        showSuccess('Datei hochgeladen.')
+        showSuccess(this.t('uploadSuccess'))
       } catch (e) {
-        showError('Upload fehlgeschlagen.')
+        showError(this.t('uploadError'))
       } finally {
         this.attachmentUploading = false
       }
@@ -1749,7 +1760,7 @@ export default {
       return head?.getAttribute('data-user') || ''
     },
     async removeElement(element) {
-      if (!window.confirm('Korrespondenz/Notiz wirklich löschen?')) {
+      if (!window.confirm(this.t('deleteElementConfirm'))) {
         return
       }
       this.savingElement = true
@@ -1758,7 +1769,7 @@ export default {
         await deleteCaseElement(element.id)
         this.elements = this.elements.filter((entry) => entry.id !== element.id)
       } catch (e) {
-        this.elementError = 'Löschen fehlgeschlagen.'
+        this.elementError = this.t('deleteError')
       } finally {
         this.savingElement = false
       }
@@ -1768,7 +1779,7 @@ export default {
         return '–'
       }
       const found = this.customers.find((customer) => customer.id === customerId)
-      return found ? found.company || 'Unbenannt' : '–'
+      return found ? found.company || this.t('unnamed') : '–'
     },
   },
 }

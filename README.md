@@ -96,6 +96,21 @@ Open `http://localhost:8080` and log in with:
 
 The app is mounted at `apps/nextledger` and loaded in Nextcloud as `nextledger`.
 
+### Enable Nextcloud Mail App (local Docker)
+If you want to test NextLedger's Nextcloud Mail provider integration locally, enable the `mail` app once in the container:
+
+```sh
+docker compose exec -T --user root nextcloud chown -R www-data:www-data /var/www/html/custom_apps
+docker compose exec -T nextcloud php occ config:system:set appstoreenabled --type=boolean --value=true
+docker compose exec -T nextcloud php occ app:install mail
+```
+
+Verify:
+
+```sh
+docker compose exec -T nextcloud php occ app:list | rg mail
+```
+
 ## Development
 ```sh
 npm install

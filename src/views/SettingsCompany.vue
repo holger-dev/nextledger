@@ -1,39 +1,39 @@
 <template>
   <section class="settings">
-    <h1>Firma</h1>
+    <h1>{{ t('title') }}</h1>
 
     <NcLoadingIcon v-if="loading" />
 
     <div v-else class="form">
       <div class="new-company-row">
         <NcTextField
-          label="Neue Firma anlegen"
+          :label="t('newCompanyLabel')"
           :value.sync="newCompanyName"
-          placeholder="z.B. Muster GmbH"
+          :placeholder="t('newCompanyPlaceholder')"
         />
         <NcButton type="secondary" :disabled="creating" @click="createNewCompany">
-          Anlegen
+          {{ t('create') }}
         </NcButton>
       </div>
 
       <div class="company-list">
-        <h2>Firmenübersicht</h2>
+        <h2>{{ t('overviewTitle') }}</h2>
         <table class="table">
           <thead>
             <tr>
-              <th>Firma</th>
-              <th>Inhaber</th>
-              <th>Status</th>
-              <th class="actions-cell">Aktionen</th>
+              <th>{{ t('company') }}</th>
+              <th>{{ t('owner') }}</th>
+              <th>{{ t('status') }}</th>
+              <th class="actions-cell">{{ t('actions') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="entry in companies" :key="entry.id">
-              <td class="name">{{ entry.name || `Firma #${entry.id}` }}</td>
+              <td class="name">{{ entry.name || `${t('company')} #${entry.id}` }}</td>
               <td>{{ entry.ownerName || '—' }}</td>
               <td>
-                <span v-if="isActiveCompany(entry.id)" class="status active">Aktiv</span>
-                <span v-else class="status inactive">Inaktiv</span>
+                <span v-if="isActiveCompany(entry.id)" class="status active">{{ t('active') }}</span>
+                <span v-else class="status inactive">{{ t('inactive') }}</span>
               </td>
               <td class="actions-cell">
                 <NcButton
@@ -41,14 +41,14 @@
                   :disabled="switching || isActiveCompany(entry.id)"
                   @click="switchCompany(entry.id)"
                 >
-                  Wechseln
+                  {{ t('switch') }}
                 </NcButton>
                 <NcButton
                   type="tertiary"
                   :disabled="switching || companies.length <= 1 || isActiveCompany(entry.id)"
                   @click="deleteCompanyEntry(entry)"
                 >
-                  Löschen
+                  {{ t('delete') }}
                 </NcButton>
               </td>
             </tr>
@@ -56,23 +56,23 @@
         </table>
       </div>
 
-      <NcTextField label="Firma" :value.sync="form.name" />
-      <NcTextField label="Firmeninhaber" :value.sync="form.ownerName" />
-      <NcTextField label="Straße" :value.sync="form.street" />
-      <NcTextField label="Hausnummer" :value.sync="form.houseNumber" />
-      <NcTextField label="PLZ" :value.sync="form.zip" />
-      <NcTextField label="Stadt" :value.sync="form.city" />
-      <NcTextField label="E-Mail" :value.sync="form.email" />
-      <NcTextField label="Telefon" :value.sync="form.phone" />
-      <NcTextField label="USt-Id" :value.sync="form.vatId" />
-      <NcTextField label="Steuernummer" :value.sync="form.taxId" />
+      <NcTextField :label="t('company')" :value.sync="form.name" />
+      <NcTextField :label="t('ownerName')" :value.sync="form.ownerName" />
+      <NcTextField :label="t('street')" :value.sync="form.street" />
+      <NcTextField :label="t('houseNumber')" :value.sync="form.houseNumber" />
+      <NcTextField :label="t('zip')" :value.sync="form.zip" />
+      <NcTextField :label="t('city')" :value.sync="form.city" />
+      <NcTextField :label="t('email')" :value.sync="form.email" />
+      <NcTextField :label="t('phone')" :value.sync="form.phone" />
+      <NcTextField :label="t('vatId')" :value.sync="form.vatId" />
+      <NcTextField :label="t('taxId')" :value.sync="form.taxId" />
 
       <div class="form-actions">
         <NcButton type="primary" :disabled="saving" @click="save">
-          Speichern
+          {{ t('save') }}
         </NcButton>
-        <span v-if="saving" class="hint">Speichere…</span>
-        <span v-if="saved" class="success">Gespeichert</span>
+        <span v-if="saving" class="hint">{{ t('saving') }}</span>
+        <span v-if="saved" class="success">{{ t('saved') }}</span>
         <span v-if="error" class="error">{{ error }}</span>
       </div>
     </div>
@@ -127,6 +127,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`settingsCompany.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -134,7 +137,7 @@ export default {
         await this.refreshCompanies()
         await this.loadActiveCompany()
       } catch (e) {
-        this.error = 'Daten konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -178,7 +181,7 @@ export default {
         await this.loadActiveCompany()
         this.emitCompanyChanged()
       } catch (e) {
-        this.error = 'Firma konnte nicht gewechselt werden.'
+        this.error = this.t('switchError')
       } finally {
         this.switching = false
       }
@@ -187,14 +190,14 @@ export default {
       this.creating = true
       this.error = ''
       try {
-        const name = (this.newCompanyName || '').trim() || 'Neue Firma'
+        const name = (this.newCompanyName || '').trim() || this.t('newCompanyDefault')
         await createCompany({ name })
         this.newCompanyName = ''
         await this.refreshCompanies()
         await this.loadActiveCompany()
         this.emitCompanyChanged()
       } catch (e) {
-        this.error = 'Firma konnte nicht angelegt werden.'
+        this.error = this.t('createError')
       } finally {
         this.creating = false
       }
@@ -205,10 +208,10 @@ export default {
         return
       }
       if (this.isActiveCompany(companyId)) {
-        this.error = 'Aktive Firma kann nicht gelöscht werden.'
+        this.error = this.t('activeDeleteError')
         return
       }
-      if (!window.confirm(`Firma "${entry?.name || `#${companyId}`}" wirklich löschen?`)) {
+      if (!window.confirm(this.t('deleteConfirm').replace('{name}', entry?.name || `#${companyId}`))) {
         return
       }
 
@@ -220,7 +223,7 @@ export default {
         await this.loadActiveCompany()
         this.emitCompanyChanged()
       } catch (e) {
-        this.error = 'Firma konnte nicht gelöscht werden.'
+        this.error = this.t('deleteError')
       } finally {
         this.switching = false
       }
@@ -239,7 +242,7 @@ export default {
           this.saved = false
         }, 2000)
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }

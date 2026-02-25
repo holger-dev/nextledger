@@ -1,28 +1,28 @@
 <template>
   <section class="settings">
-    <h1>Kontodaten</h1>
+    <h1>{{ t('title') }}</h1>
 
     <NcLoadingIcon v-if="loading" />
 
     <div v-else class="form">
       <NcTextField
-        label="Zahlungsziel (Tage) *"
+        :label="t('paymentTermsDays')"
         type="text"
-        placeholder="z. B. 14"
+        :placeholder="t('paymentTermsPlaceholder')"
         :value.sync="form.paymentTermsDays"
       />
       <p v-if="fieldErrors.paymentTermsDays" class="field-error">{{ fieldErrors.paymentTermsDays }}</p>
-      <NcTextField label="Bankname" :value.sync="form.bankName" />
-      <NcTextField label="IBAN" :value.sync="form.iban" />
-      <NcTextField label="BIC" :value.sync="form.bic" />
-      <NcTextField label="Kontoinhaber" :value.sync="form.accountHolder" />
+      <NcTextField :label="t('bankName')" :value.sync="form.bankName" />
+      <NcTextField :label="t('iban')" :value.sync="form.iban" />
+      <NcTextField :label="t('bic')" :value.sync="form.bic" />
+      <NcTextField :label="t('accountHolder')" :value.sync="form.accountHolder" />
 
       <div class="actions">
         <NcButton type="primary" :disabled="saving" @click="save">
-          Speichern
+          {{ t('save') }}
         </NcButton>
-        <span v-if="saving" class="hint">Speichere…</span>
-        <span v-if="saved" class="success">Gespeichert</span>
+        <span v-if="saving" class="hint">{{ t('saving') }}</span>
+        <span v-if="saved" class="success">{{ t('saved') }}</span>
         <span v-if="error" class="error">{{ error }}</span>
       </div>
     </div>
@@ -61,6 +61,9 @@ export default {
     await this.load()
   },
   methods: {
+    t(key) {
+      return this.$tKey(`settingsMisc.${key}`, key)
+    },
     async load() {
       this.loading = true
       this.error = ''
@@ -76,7 +79,7 @@ export default {
           accountHolder: safeString(data.accountHolder),
         }
       } catch (e) {
-        this.error = 'Daten konnten nicht geladen werden.'
+        this.error = this.t('loadError')
       } finally {
         this.loading = false
       }
@@ -89,7 +92,7 @@ export default {
         this.fieldErrors = {}
         const days = Number(this.form.paymentTermsDays || 0)
         if (!Number.isInteger(days) || days < 0) {
-          this.fieldErrors = { paymentTermsDays: 'Bitte eine gültige Anzahl Tage angeben.' }
+          this.fieldErrors = { paymentTermsDays: this.t('paymentTermsError') }
           this.saving = false
           return
         }
@@ -107,7 +110,7 @@ export default {
           this.saved = false
         }, 2000)
       } catch (e) {
-        this.error = 'Speichern fehlgeschlagen.'
+        this.error = this.t('saveError')
       } finally {
         this.saving = false
       }

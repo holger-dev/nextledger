@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 1.5.0
+- Add language-file based DE/EN support with centralized i18n runtime translation
+- Improve email behavior UX with explicit sender logic and optional sender/reply-to override switch
+
+## 1.4.0
+- Add per-company email delivery settings with selectable mode per company
+- Add Nextcloud Mail Provider integration for direct offer/invoice sending
+- Keep Admin SMTP as selectable fallback per company
+- Add bilingual (DE/EN) labels in the E-Mail behavior settings UI
+
 ## 1.2.0
 - Add multi-company support with one active company context at a time
 - Scope core data by active company (customers, cases, offers, invoices, products, fiscal years, incomes, expenses)

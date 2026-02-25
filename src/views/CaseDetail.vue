@@ -2,10 +2,10 @@
   <section class="case-detail">
     <div class="header">
       <div>
-        <h1>Vorgang</h1>
-        <p class="subline">Details für diesen Vorgang.</p>
+        <h1>{{ t('title') }}</h1>
+        <p class="subline">{{ t('subline') }}</p>
       </div>
-      <NcButton type="secondary" @click="goBack">Zur Übersicht</NcButton>
+      <NcButton type="secondary" @click="goBack">{{ t('back') }}</NcButton>
     </div>
 
     <NcLoadingIcon v-if="loading" />
@@ -36,6 +36,9 @@ export default {
     },
   },
   methods: {
+    t(key) {
+      return this.$tKey(`caseDetail.${key}`, key)
+    },
     goBack() {
       this.$router.push({ name: 'cases' })
     },

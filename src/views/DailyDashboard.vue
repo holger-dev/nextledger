@@ -1,9 +1,9 @@
 <template>
   <section>
-    <h1>Tägliches</h1>
+    <h1>{{ t('title') }}</h1>
     <NcEmptyContent
-      name="Noch keine Daten"
-      description="Hier erscheinen offene Rechnungen und aktuelle Vorgänge."
+      :name="t('emptyName')"
+      :description="t('emptyDescription')"
     />
   </section>
 </template>
@@ -15,6 +15,11 @@ export default {
   name: 'DailyDashboard',
   components: {
     NcEmptyContent,
+  },
+  methods: {
+    t(key) {
+      return this.$tKey(`dailyDashboard.${key}`, key)
+    },
   },
 }
 </script>

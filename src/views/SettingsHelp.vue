@@ -1,124 +1,123 @@
 <template>
   <section class="settings-help">
-    <h1>Hilfe</h1>
+    <h1>{{ t('title') }}</h1>
 
     <div class="card">
-      <h2>Einrichtung (erste Schritte)</h2>
+      <h2>{{ t('setupTitle') }}</h2>
       <ol>
-        <li>Wirtschaftsjahr anlegen</li>
-        <li>Firmadaten eintragen</li>
-        <li>Kunden anlegen</li>
-        <li>Optional: Produkte/DL anlegen</li>
-        <li>Vorgänge erstellen und Angebote/Rechnungen ableiten</li>
+        <li>{{ t('setupStep1') }}</li>
+        <li>{{ t('setupStep2') }}</li>
+        <li>{{ t('setupStep3') }}</li>
+        <li>{{ t('setupStep4') }}</li>
+        <li>{{ t('setupStep5') }}</li>
       </ol>
       <div class="setup-links">
         <NcButton type="secondary" :to="{ name: 'fiscal-year' }">
-          Wirtschaftsjahr
+          {{ t('fiscalYearLink') }}
         </NcButton>
         <NcButton type="secondary" :to="{ name: 'settings-company' }">
-          Firmadaten
+          {{ t('companyDataLink') }}
         </NcButton>
         <NcButton type="secondary" :to="{ name: 'customers' }">
-          Kunden
+          {{ t('customersLink') }}
         </NcButton>
         <NcButton type="secondary" :to="{ name: 'products' }">
-          Produkte/DL
+          {{ t('productsLink') }}
         </NcButton>
         <NcButton type="secondary" :to="{ name: 'cases' }">
-          Vorgänge
+          {{ t('casesLink') }}
         </NcButton>
       </div>
     </div>
 
     <div class="card">
-      <h2>Kurzanleitung</h2>
+      <h2>{{ t('quickGuideTitle') }}</h2>
       <ol>
-        <li>Kunden anlegen und Kontakte pflegen</li>
-        <li>Vorgang erstellen und dem Kunden zuordnen</li>
-        <li>Leistungen als Positionen hinzufügen</li>
-        <li>Angebot erstellen oder direkt Rechnung anlegen</li>
-        <li>PDF exportieren und versenden</li>
-        <li>Einnahmen/Ausgaben im Wirtschaftsjahr prüfen</li>
+        <li>{{ t('quickGuideStep1') }}</li>
+        <li>{{ t('quickGuideStep2') }}</li>
+        <li>{{ t('quickGuideStep3') }}</li>
+        <li>{{ t('quickGuideStep4') }}</li>
+        <li>{{ t('quickGuideStep5') }}</li>
+        <li>{{ t('quickGuideStep6') }}</li>
       </ol>
     </div>
 
     <div class="card">
-      <h2>Grundbegriffe</h2>
+      <h2>{{ t('termsTitle') }}</h2>
       <ul>
-        <li>Kunde: Stammdaten, Rechnungs‑E-Mail, Ansprechpartner.</li>
-        <li>Vorgang: Klammer für Angebot, Rechnung, Notizen und Korrespondenz.</li>
-        <li>Position: Einzelne Leistung/Produkt mit Menge und Preis.</li>
-        <li>Angebot: Verbindliche Preisübersicht für den Kunden.</li>
-        <li>Rechnung: Zahlungsaufforderung, erzeugt Einnahmen im Wirtschaftsjahr.</li>
+        <li>{{ t('termCustomer') }}</li>
+        <li>{{ t('termCase') }}</li>
+        <li>{{ t('termPosition') }}</li>
+        <li>{{ t('termOffer') }}</li>
+        <li>{{ t('termInvoice') }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h2>Angebote & Rechnungen</h2>
+      <h2>{{ t('offersInvoicesTitle') }}</h2>
       <ul>
-        <li>Du kannst aus einem Vorgang jederzeit ein Angebot oder eine Rechnung erstellen.</li>
-        <li>Positionen lassen sich aus Produkten übernehmen oder manuell anlegen.</li>
-        <li>Rechnungsnummern werden automatisch vergeben.</li>
-        <li>PDFs findest du direkt in den Aktionen einer Rechnung/Angebots.</li>
+        <li>{{ t('offersInvoicesPoint1') }}</li>
+        <li>{{ t('offersInvoicesPoint2') }}</li>
+        <li>{{ t('offersInvoicesPoint3') }}</li>
+        <li>{{ t('offersInvoicesPoint4') }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h2>Abschlagszahlung & Schlussrechnung</h2>
+      <h2>{{ t('advanceTitle') }}</h2>
       <p>
-        Abschlagsrechnungen dienen der Teilzahlung während eines laufenden Projekts.
-        Die Schlussrechnung stellt die Gesamtsumme dar und zieht bereits gezahlte Abschläge ab.
+        {{ t('advanceIntro') }}
       </p>
       <ul>
-        <li>Abschlagsrechnung: Teilbetrag fakturieren, z. B. 30% vor Projektstart.</li>
-        <li>Schlussrechnung: Gesamtbetrag minus Summe der Abschläge.</li>
-        <li>Tipp: Lege Abschläge als separate Rechnungen im selben Vorgang an.</li>
-        <li>Notiere im Rechnungstext, auf welches Angebot oder welche Abschläge sich die Rechnung bezieht.</li>
+        <li>{{ t('advancePoint1') }}</li>
+        <li>{{ t('advancePoint2') }}</li>
+        <li>{{ t('advancePoint3') }}</li>
+        <li>{{ t('advancePoint4') }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h2>E-Mailversand</h2>
+      <h2>{{ t('emailTitle') }}</h2>
       <ul>
-        <li>Manuell: Mailvorlage öffnen, PDF anhängen und versenden.</li>
-        <li>Direkt: Versand über den Admin‑SMTP‑Server mit Vorschau.</li>
-        <li>Die Standard‑Absenderadresse kommt aus der Nextcloud‑Administration.</li>
-        <li>Empfängerlogik beim Kunden: Rechnungs‑E-Mail hat Vorrang, sonst Ansprechpartner.</li>
+        <li>{{ t('emailPoint1') }}</li>
+        <li>{{ t('emailPoint2') }}</li>
+        <li>{{ t('emailPoint3') }}</li>
+        <li>{{ t('emailPoint4') }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h2>Wirtschaftsjahr</h2>
+      <h2>{{ t('fiscalYearTitle') }}</h2>
       <ul>
-        <li>Ohne aktives Wirtschaftsjahr können keine Rechnungen erstellt werden.</li>
-        <li>Es kann immer nur ein Wirtschaftsjahr aktiv sein.</li>
-        <li>Einnahmen entstehen automatisch durch Rechnungen.</li>
-        <li>Ausgaben kannst du manuell erfassen.</li>
-        <li>Der GÜB‑Export fasst Einnahmen, Ausgaben und Ergebnis zusammen.</li>
+        <li>{{ t('fiscalYearPoint1') }}</li>
+        <li>{{ t('fiscalYearPoint2') }}</li>
+        <li>{{ t('fiscalYearPoint3') }}</li>
+        <li>{{ t('fiscalYearPoint4') }}</li>
+        <li>{{ t('fiscalYearPoint5') }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h2>Texte & Vorlagen</h2>
+      <h2>{{ t('textsTemplatesTitle') }}</h2>
       <ul>
-        <li>Texte für PDF und E‑Mail findest du unter Einstellungen → Texte.</li>
-        <li>Änderungen gelten nur für neue Dokumente.</li>
-        <li>Nutze Platzhalter, falls vorhanden, um Nummern oder Namen automatisch einzusetzen.</li>
+        <li>{{ t('textsTemplatesPoint1') }}</li>
+        <li>{{ t('textsTemplatesPoint2') }}</li>
+        <li>{{ t('textsTemplatesPoint3') }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h2>Fehlerbehebung</h2>
+      <h2>{{ t('troubleshootingTitle') }}</h2>
       <ul>
-        <li>Fehlendes PDF: Seite neu laden und erneut exportieren.</li>
-        <li>Kein Versand möglich: SMTP‑Einstellungen in Nextcloud prüfen.</li>
-        <li>Falsche Zahlen: Prüfe Positionen, Steuersatz und Abschläge im Vorgang.</li>
+        <li>{{ t('troubleshootingPoint1') }}</li>
+        <li>{{ t('troubleshootingPoint2') }}</li>
+        <li>{{ t('troubleshootingPoint3') }}</li>
       </ul>
     </div>
 
     <div class="card">
-      <h2>Support</h2>
-      <p>Bei Fragen oder Feedback: <strong>holger@heidkamp.dev</strong></p>
+      <h2>{{ t('supportTitle') }}</h2>
+      <p>{{ t('supportText') }} <strong>holger@heidkamp.dev</strong></p>
     </div>
   </section>
 </template>
@@ -130,6 +129,11 @@ export default {
   name: 'SettingsHelp',
   components: {
     NcButton,
+  },
+  methods: {
+    t(key) {
+      return this.$tKey(`settingsHelp.${key}`, key)
+    },
   },
 }
 </script>
