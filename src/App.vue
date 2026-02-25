@@ -25,7 +25,7 @@
 
     <NcAppContent>
       <div class="nextledger-content">
-        <router-view />
+        <router-view :key="viewKey" />
       </div>
     </NcAppContent>
   </NcContent>
@@ -55,6 +55,7 @@ export default {
   data() {
     return {
       activeCompanyName: '',
+      companyContextVersion: 0,
     }
   },
   computed: {
@@ -63,15 +64,22 @@ export default {
         ? `Vorgänge · ${this.activeCompanyName}`
         : 'Vorgänge'
     },
+    viewKey() {
+      return `${this.$route.fullPath}:${this.companyContextVersion}`
+    },
   },
   async created() {
     await this.loadCompanyContext()
-    window.addEventListener('nextledger-company-changed', this.loadCompanyContext)
+    window.addEventListener('nextledger-company-changed', this.handleCompanyChanged)
   },
   beforeDestroy() {
-    window.removeEventListener('nextledger-company-changed', this.loadCompanyContext)
+    window.removeEventListener('nextledger-company-changed', this.handleCompanyChanged)
   },
   methods: {
+    async handleCompanyChanged() {
+      await this.loadCompanyContext()
+      this.companyContextVersion += 1
+    },
     async loadCompanyContext() {
       try {
         const data = await getCompanies()

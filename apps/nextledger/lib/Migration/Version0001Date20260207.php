@@ -214,6 +214,7 @@ class Version0001Date20260207 extends SimpleMigrationStep {
             $table->addColumn('name', 'string', ['length' => 255, 'notnull' => false]);
             $table->addColumn('date_start', 'integer', ['notnull' => false]);
             $table->addColumn('date_end', 'integer', ['notnull' => false]);
+            $table->addColumn('is_active', 'boolean', ['notnull' => false, 'default' => false]);
             $table->addColumn('created_at', 'integer', ['notnull' => false]);
             $table->addColumn('updated_at', 'integer', ['notnull' => false]);
             $table->setPrimaryKey(['id']);
