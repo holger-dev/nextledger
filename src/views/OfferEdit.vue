@@ -87,6 +87,26 @@
           />
           <p v-if="fieldErrors.validUntil" class="field-error">{{ fieldErrors.validUntil }}</p>
           </div>
+          <div class="form-group tax-toggle">
+            <NcCheckboxRadioSwitch
+              type="switch"
+              :checked="form.isSmallBusiness"
+              @update:checked="form.isSmallBusiness = $event"
+            >
+              {{ t('smallBusinessSwitch') }}
+            </NcCheckboxRadioSwitch>
+          </div>
+          <div class="form-group">
+            <NcTextField
+              :label="t('vatRate')"
+              type="text"
+              :placeholder="t('vatRatePlaceholder')"
+              :disabled="form.isSmallBusiness"
+              :value.sync="form.taxRatePercent"
+            />
+            <p v-if="fieldErrors.taxRatePercent" class="field-error">{{ fieldErrors.taxRatePercent }}</p>
+            <p class="field-hint">{{ t('vatRateHint') }}</p>
+          </div>
         </div>
 
         <div class="form-group">
@@ -147,7 +167,7 @@
                   />
                 <span v-else>–</span>
               </td>
-              <td class="col-qty">
+              <td class="col-name">
                 <NcTextField
                   v-if="item.positionType === 'custom'"
                   :label="t('name')"
@@ -156,7 +176,7 @@
                 />
                 <span v-else>{{ item.name || '–' }}</span>
               </td>
-              <td>
+              <td class="col-description">
                 <NcTextField
                   v-if="item.positionType === 'custom'"
                   :label="t('description')"
@@ -165,7 +185,7 @@
                 />
                 <span v-else>{{ item.description || '–' }}</span>
               </td>
-              <td>
+              <td class="col-qty">
                 <NcTextField
                   :label="t('quantityRequired')"
                   type="text"
@@ -224,7 +244,7 @@
             {{ smallBusinessNote }}
           </p>
           <p v-else>
-            {{ t('tax') }} ({{ formatTaxRate(form.taxRateBp) }}): {{ formatPrice(taxCents) }}
+            {{ t('tax') }} ({{ formatTaxRate(resolvedTaxRateBp) }}): {{ formatPrice(taxCents) }}
           </p>
         </div>
         <div class="total">
@@ -248,7 +268,7 @@
 </template>
 
 <script>
-import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
+import { NcButton, NcCheckboxRadioSwitch, NcLoadingIcon } from '@nextcloud/vue'
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
@@ -284,6 +304,34 @@ const centsFromInput = (value) => {
     return null
   }
   return Math.round(parsed * 100)
+}
+
+const percentToBasisPoints = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const raw = String(value).trim().replace(/\s/g, '')
+  if (!raw) {
+    return null
+  }
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw
+  const parsed = Number(normalized)
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return null
+  }
+  return Math.round(parsed * 100)
+}
+
+const percentFromBasisPoints = (value) => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return (Number(value) / 100).toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 const inputFromCents = (value) => {
@@ -328,6 +376,7 @@ export default {
   name: 'OfferEdit',
   components: {
     NcButton,
+    NcCheckboxRadioSwitch,
     NcLoadingIcon,
     NcSelect,
     NcTextArea,
@@ -358,6 +407,7 @@ export default {
         extraText: '',
         footerText: '',
         taxRateBp: null,
+        taxRatePercent: '19,00',
         isSmallBusiness: false,
         items: [],
       },
@@ -411,11 +461,17 @@ export default {
     subtotalCents() {
       return this.form.items.reduce((sum, item) => sum + this.itemTotalCents(item), 0)
     },
+    resolvedTaxRateBp() {
+      if (this.form.isSmallBusiness) {
+        return 0
+      }
+      return percentToBasisPoints(this.form.taxRatePercent) ?? Number(this.form.taxRateBp || 0)
+    },
     taxCents() {
       if (this.form.isSmallBusiness) {
         return 0
       }
-      const rate = Number(this.form.taxRateBp || 0)
+      const rate = this.resolvedTaxRateBp
       return Math.round((this.subtotalCents * rate) / 10000)
     },
     smallBusinessNote() {
@@ -506,6 +562,7 @@ export default {
           extraText: offer.extraText || '',
           footerText: offer.footerText || this.texts?.footerText || '',
           taxRateBp: offer.taxRateBp ?? this.tax?.vatRateBp ?? 0,
+          taxRatePercent: percentFromBasisPoints(offer.taxRateBp ?? this.tax?.vatRateBp ?? 0),
           isSmallBusiness: offer.isSmallBusiness ?? this.tax?.isSmallBusiness ?? false,
           items: this.offerItems.map((item) => ({
             key: `item-${item.id}`,
@@ -629,6 +686,13 @@ export default {
         this.fieldErrors = { validUntil: this.t('validUntilError') }
         return
       }
+      const taxRateBp = this.form.isSmallBusiness
+        ? 0
+        : percentToBasisPoints(this.form.taxRatePercent)
+      if (!this.form.isSmallBusiness && taxRateBp === null) {
+        this.fieldErrors = { taxRatePercent: this.t('vatRateError') }
+        return
+      }
       this.saving = true
       this.error = ''
       this.saved = false
@@ -646,9 +710,10 @@ export default {
           subtotalCents: this.subtotalCents,
           taxCents: this.taxCents,
           totalCents: this.totalCents,
-          taxRateBp: this.form.taxRateBp,
+          taxRateBp,
           isSmallBusiness: this.form.isSmallBusiness,
         }
+        this.form.taxRateBp = taxRateBp
         await updateOffer(this.offerId, payload)
 
         const existingItems = await getOfferItems(this.offerId)
@@ -765,12 +830,22 @@ export default {
 
 .table th.col-type,
 .table td.col-type {
-  width: clamp(40px, 5vw, 65px);
+  width: clamp(120px, 14vw, 160px);
 }
 
 .table th.col-product,
 .table td.col-product {
-  width: clamp(90px, 11vw, 150px);
+  width: clamp(170px, 18vw, 240px);
+}
+
+.table th.col-name,
+.table td.col-name {
+  width: clamp(200px, 22vw, 320px);
+}
+
+.table th.col-description,
+.table td.col-description {
+  min-width: clamp(220px, 26vw, 360px);
 }
 
 .table th.col-qty,
@@ -865,6 +940,10 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.tax-toggle {
+  justify-content: flex-end;
 }
 
 

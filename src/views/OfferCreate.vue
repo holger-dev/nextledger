@@ -88,6 +88,26 @@
             />
             <p v-if="fieldErrors.validUntil" class="field-error">{{ fieldErrors.validUntil }}</p>
           </div>
+          <div class="form-group tax-toggle">
+            <NcCheckboxRadioSwitch
+              type="switch"
+              :checked="form.isSmallBusiness"
+              @update:checked="form.isSmallBusiness = $event"
+            >
+              {{ t('smallBusinessSwitch') }}
+            </NcCheckboxRadioSwitch>
+          </div>
+          <div class="form-group">
+            <NcTextField
+              :label="t('vatRate')"
+              type="text"
+              :placeholder="t('vatRatePlaceholder')"
+              :disabled="form.isSmallBusiness"
+              :value.sync="form.taxRatePercent"
+            />
+            <p v-if="fieldErrors.taxRatePercent" class="field-error">{{ fieldErrors.taxRatePercent }}</p>
+            <p class="hint">{{ t('vatRateHint') }}</p>
+          </div>
         </div>
 
         <div class="form-group">
@@ -150,7 +170,7 @@
                   />
                 <span v-else>–</span>
               </td>
-              <td class="col-qty">
+              <td class="col-name">
                 <NcTextField
                   v-if="item.positionType === 'custom'"
                   :label="t('name')"
@@ -159,7 +179,7 @@
                 />
                 <span v-else>{{ item.name || '–' }}</span>
               </td>
-              <td>
+              <td class="col-description">
                 <NcTextField
                   v-if="item.positionType === 'custom'"
                   :label="t('description')"
@@ -168,7 +188,7 @@
                 />
                 <span v-else>{{ item.description || '–' }}</span>
               </td>
-              <td>
+              <td class="col-qty">
                 <NcTextField
                   :label="t('quantityRequired')"
                   type="text"
@@ -227,7 +247,7 @@
               {{ smallBusinessNote }}
             </p>
             <p v-else>
-            {{ t('tax') }} ({{ formatTaxRate(form.taxRateBp) }}): {{ formatPrice(taxCents) }}
+            {{ t('tax') }} ({{ formatTaxRate(resolvedTaxRateBp) }}): {{ formatPrice(taxCents) }}
             </p>
         </div>
         <div class="total">
@@ -251,7 +271,7 @@
 </template>
 
 <script>
-import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
+import { NcButton, NcCheckboxRadioSwitch, NcLoadingIcon } from '@nextcloud/vue'
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
 import NcDateTimePickerNative from '@nextcloud/vue/dist/Components/NcDateTimePickerNative.mjs'
@@ -288,6 +308,34 @@ const centsFromInput = (value) => {
     return null
   }
   return Math.round(parsed * 100)
+}
+
+const percentToBasisPoints = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const raw = String(value).trim().replace(/\s/g, '')
+  if (!raw) {
+    return null
+  }
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw
+  const parsed = Number(normalized)
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return null
+  }
+  return Math.round(parsed * 100)
+}
+
+const percentFromBasisPoints = (value) => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return (Number(value) / 100).toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 const inputFromCents = (value) => {
@@ -354,6 +402,7 @@ export default {
   name: 'OfferCreate',
   components: {
     NcButton,
+    NcCheckboxRadioSwitch,
     NcLoadingIcon,
     NcSelect,
     NcTextArea,
@@ -383,6 +432,7 @@ export default {
         extraText: '',
         footerText: '',
         taxRateBp: null,
+        taxRatePercent: '19,00',
         isSmallBusiness: false,
         items: [],
       },
@@ -449,11 +499,17 @@ export default {
     subtotalCents() {
       return this.form.items.reduce((sum, item) => sum + this.itemTotalCents(item), 0)
     },
+    resolvedTaxRateBp() {
+      if (this.form.isSmallBusiness) {
+        return 0
+      }
+      return percentToBasisPoints(this.form.taxRatePercent) ?? Number(this.form.taxRateBp || 0)
+    },
     taxCents() {
       if (this.form.isSmallBusiness) {
         return 0
       }
-      const rate = Number(this.form.taxRateBp || 0)
+      const rate = this.resolvedTaxRateBp
       return Math.round((this.subtotalCents * rate) / 10000)
     },
     smallBusinessNote() {
@@ -559,6 +615,7 @@ export default {
         extraText: '',
         footerText: this.texts?.footerText || '',
         taxRateBp: this.tax?.vatRateBp ?? 0,
+        taxRatePercent: percentFromBasisPoints(this.tax?.vatRateBp ?? 0),
         isSmallBusiness: this.tax?.isSmallBusiness ?? false,
         items: [createEmptyItem()],
       }
@@ -667,34 +724,19 @@ export default {
         this.fieldErrors = { validUntil: this.t('validUntilError') }
         return
       }
+      const currentTaxRateBp = this.form.isSmallBusiness
+        ? 0
+        : percentToBasisPoints(this.form.taxRatePercent)
+      if (!this.form.isSmallBusiness && currentTaxRateBp === null) {
+        this.fieldErrors = { taxRatePercent: this.t('vatRateError') }
+        return
+      }
       this.saving = true
       this.error = ''
       this.saved = false
       try {
-        const taxSettings = await getTax()
-        const parseBool = (v) => {
-          if (v === true || v === false) {
-            return v
-          }
-          if (v === 1 || v === '1') {
-            return true
-          }
-          if (v === 0 || v === '0') {
-            return false
-          }
-          if (typeof v === 'string') {
-            return ['true', 'yes', 'on'].includes(v.toLowerCase())
-          }
-          return Boolean(v)
-        }
-        const currentIsSmallBusiness = parseBool(taxSettings?.isSmallBusiness)
-        const currentTaxRateBp = Number(taxSettings?.vatRateBp || 0)
-
-        this.form.isSmallBusiness = currentIsSmallBusiness
-        this.form.taxRateBp = currentTaxRateBp
-
         const subtotalCents = this.subtotalCents
-        const taxCents = currentIsSmallBusiness
+        const taxCents = this.form.isSmallBusiness
           ? 0
           : Math.round((subtotalCents * currentTaxRateBp) / 10000)
         const totalCents = subtotalCents + taxCents
@@ -712,8 +754,9 @@ export default {
           taxCents,
           totalCents,
           taxRateBp: currentTaxRateBp,
-          isSmallBusiness: currentIsSmallBusiness,
+          isSmallBusiness: this.form.isSmallBusiness,
         }
+        this.form.taxRateBp = currentTaxRateBp
         const offer = await createOffer(payload)
 
         const items = this.form.items
@@ -831,12 +874,22 @@ export default {
 
 .table th.col-type,
 .table td.col-type {
-  width: clamp(40px, 5vw, 65px);
+  width: clamp(120px, 14vw, 160px);
 }
 
 .table th.col-product,
 .table td.col-product {
-  width: clamp(90px, 11vw, 150px);
+  width: clamp(170px, 18vw, 240px);
+}
+
+.table th.col-name,
+.table td.col-name {
+  width: clamp(200px, 22vw, 320px);
+}
+
+.table th.col-description,
+.table td.col-description {
+  min-width: clamp(220px, 26vw, 360px);
 }
 
 .table th.col-qty,
@@ -901,6 +954,10 @@ export default {
   gap: 8px;
   width: 100%;
   max-width: 860px;
+}
+
+.tax-toggle {
+  justify-content: flex-end;
 }
 
 .divider {
