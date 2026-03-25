@@ -17,12 +17,7 @@ class FiscalYearMapper extends BaseMapper {
         $qb = $this->db->getQueryBuilder();
         $qb->update($this->tableName)
             ->set('is_active', $qb->createNamedParameter(0, IQueryBuilder::PARAM_INT))
-            ->where(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)),
-                    $qb->expr()->isNull('company_id')
-                )
-            );
+            ->where($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)));
 
         if ($id !== null) {
             $qb->andWhere($qb->expr()->neq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)));
@@ -41,12 +36,7 @@ class FiscalYearMapper extends BaseMapper {
                     $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)
                 ),
             )
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)),
-                    $qb->expr()->isNull('company_id')
-                )
-            )
+            ->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)))
             ->setMaxResults(1);
 
         $items = $this->findEntities($qb);
@@ -69,12 +59,7 @@ class FiscalYearMapper extends BaseMapper {
                     $qb->createNamedParameter($timestamp, IQueryBuilder::PARAM_INT)
                 )
             )
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)),
-                    $qb->expr()->isNull('company_id')
-                )
-            )
+            ->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)))
             ->orderBy('date_start', 'DESC')
             ->setMaxResults(1);
 

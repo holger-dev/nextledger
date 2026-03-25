@@ -34,9 +34,10 @@ class FiscalReportsController extends ApiController {
     public function gubPdf(string $id): Response {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $yearId = (int)$id;
+        $includeDetails = $this->readIncludeDetails();
         try {
             $this->fiscalYearMapper->findByIdAndCompanyId($yearId, $companyId);
-            $result = $this->gubPdfService->buildPdf($yearId);
+            $result = $this->gubPdfService->buildPdf($yearId, $includeDetails);
         } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
             return new JSONResponse(['message' => 'Wirtschaftsjahr nicht gefunden.'], Http::STATUS_NOT_FOUND);
         } catch (\Throwable $e) {
@@ -48,5 +49,20 @@ class FiscalReportsController extends ApiController {
             $result['filename'],
             'application/pdf'
         );
+    }
+
+    private function readIncludeDetails(): bool {
+        $rawValue = $this->request->getParam('includeDetails', '1');
+        if (is_bool($rawValue)) {
+            return $rawValue;
+        }
+        if (is_int($rawValue)) {
+            return $rawValue !== 0;
+        }
+        if (!is_string($rawValue)) {
+            return true;
+        }
+
+        return in_array(strtolower($rawValue), ['1', 'true', 'yes', 'on'], true);
     }
 }

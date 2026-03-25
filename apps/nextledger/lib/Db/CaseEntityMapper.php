@@ -26,15 +26,7 @@ class CaseEntityMapper extends BaseMapper {
                     $qb->createNamedParameter($customerId, IQueryBuilder::PARAM_INT)
                 ),
             )
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq(
-                        'company_id',
-                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
-                    ),
-                    $qb->expr()->isNull('company_id')
-                )
-            )
+            ->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)))
             ->orderBy('name', 'ASC');
 
         return $this->findEntities($qb);

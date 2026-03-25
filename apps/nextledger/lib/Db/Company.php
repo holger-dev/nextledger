@@ -9,6 +9,8 @@ use OCP\AppFramework\Db\Entity;
 class Company extends Entity {
     public $id;
     public $name;
+    public $groupName;
+    public $ownerUserId;
     public $ownerName;
     public $street;
     public $houseNumber;
@@ -21,6 +23,8 @@ class Company extends Entity {
 
     public function __construct() {
         $this->addType('name', 'string');
+        $this->addType('groupName', 'string');
+        $this->addType('ownerUserId', 'string');
         $this->addType('ownerName', 'string');
         $this->addType('street', 'string');
         $this->addType('houseNumber', 'string');

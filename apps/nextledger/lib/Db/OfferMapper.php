@@ -26,15 +26,7 @@ class OfferMapper extends BaseMapper {
                     $qb->createNamedParameter($caseId, IQueryBuilder::PARAM_INT)
                 ),
             )
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq(
-                        'company_id',
-                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
-                    ),
-                    $qb->expr()->isNull('company_id')
-                )
-            )
+            ->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)))
             ->orderBy('issue_date', 'ASC');
 
         return $this->findEntities($qb);
@@ -53,15 +45,7 @@ class OfferMapper extends BaseMapper {
                     $qb->createNamedParameter($customerId, IQueryBuilder::PARAM_INT)
                 ),
             )
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq(
-                        'company_id',
-                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
-                    ),
-                    $qb->expr()->isNull('company_id')
-                )
-            )
+            ->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)))
             ->orderBy('issue_date', 'DESC');
 
         return $this->findEntities($qb);

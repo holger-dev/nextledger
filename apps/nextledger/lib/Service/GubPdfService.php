@@ -34,16 +34,20 @@ class GubPdfService {
     /**
      * @return array{filename: string, content: string}
      */
-    public function buildPdf(int $fiscalYearId): array {
+    public function buildPdf(int $fiscalYearId, bool $includeDetails = true): array {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         /** @var FiscalYear $year */
         $year = $this->fiscalYearMapper->findByIdAndCompanyId($fiscalYearId, $companyId);
         $incomes = $this->incomeMapper->findByFiscalYearId($fiscalYearId, $companyId);
         $expenses = $this->expenseMapper->findByFiscalYearId($fiscalYearId, $companyId);
 
-        $html = $this->renderHtml($year, $incomes, $expenses);
+        $html = $this->renderHtml($year, $incomes, $expenses, $includeDetails);
         $content = $this->renderPdf($html);
-        $filename = sprintf('gub-%s.pdf', $year->getName() ?: $fiscalYearId);
+        $filename = sprintf(
+            'gub-%s%s.pdf',
+            $year->getName() ?: $fiscalYearId,
+            $includeDetails ? '-einzelauflistung' : '-kompakt'
+        );
 
         return [
             'filename' => $filename,
@@ -72,7 +76,7 @@ class GubPdfService {
      * @param Income[] $incomes
      * @param Expense[] $expenses
      */
-    private function renderHtml(FiscalYear $year, array $incomes, array $expenses): string {
+    private function renderHtml(FiscalYear $year, array $incomes, array $expenses, bool $includeDetails): string {
         $range = $this->formatRange($year->getDateStart(), $year->getDateEnd());
         $incomeRows = '';
         $incomeTotal = 0;
@@ -101,6 +105,39 @@ class GubPdfService {
         }
 
         $profit = $incomeTotal - $expenseTotal;
+        $detailSections = '';
+        if ($includeDetails) {
+            $detailSections = sprintf(
+                '<div class="section-title">Einnahmen</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Beschreibung</th>
+                      <th>Datum</th>
+                      <th style="text-align:right">Betrag</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>%s</tbody>
+                </table>
+
+                <div class="section-title">Ausgaben</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Beschreibung</th>
+                      <th>Datum</th>
+                      <th style="text-align:right">Betrag</th>
+                    </tr>
+                  </thead>
+                  <tbody>%s</tbody>
+                </table>',
+                $incomeRows,
+                $expenseRows
+            );
+        } else {
+            $detailSections = '<p>Export ohne Einzelauflistung. Die Summen können bei Bedarf über die EÜR-Exporte je Firma weiterverwendet werden.</p>';
+        }
 
         return sprintf(
             '<html><head><meta charset="UTF-8"><style>
@@ -114,31 +151,8 @@ class GubPdfService {
             </style></head><body>
             <h1>GÜB %s</h1>
             <p>Zeitraum: %s</p>
-
-            <div class="section-title">Einnahmen</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Beschreibung</th>
-                  <th>Datum</th>
-                  <th style="text-align:right">Betrag</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>%s</tbody>
-            </table>
-
-            <div class="section-title">Ausgaben</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Beschreibung</th>
-                  <th>Datum</th>
-                  <th style="text-align:right">Betrag</th>
-                </tr>
-              </thead>
-              <tbody>%s</tbody>
-            </table>
+            <p>Einzelauflistung: %s</p>
+            %s
 
             <div class="totals">
               <p>Einnahmen gesamt: %s</p>
@@ -148,8 +162,8 @@ class GubPdfService {
             </body></html>',
             $this->escape($year->getName() ?: ''),
             $this->escape($range),
-            $incomeRows,
-            $expenseRows,
+            $includeDetails ? 'mit' : 'ohne',
+            $detailSections,
             $this->formatMoney($incomeTotal),
             $this->formatMoney($expenseTotal),
             $this->formatMoney($profit)

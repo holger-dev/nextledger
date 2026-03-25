@@ -14,5 +14,11 @@ export const updateFiscalYear = (id, payload) =>
 export const deleteFiscalYear = (id) =>
   axios.delete(generateUrl(`${base}/${id}`)).then((r) => r.data)
 
-export const getGubPdfUrl = (id) =>
-  generateUrl(`${base}/${id}/gub/pdf`)
+export const getGubPdfUrl = (id, includeDetails = true) => {
+  const url = generateUrl(`${base}/${id}/gub/pdf`)
+  const query = new URLSearchParams({
+    includeDetails: includeDetails ? '1' : '0',
+  })
+
+  return `${url}?${query.toString()}`
+}

@@ -26,15 +26,7 @@ class ExpenseMapper extends BaseMapper {
                     $qb->createNamedParameter($fiscalYearId, IQueryBuilder::PARAM_INT)
                 ),
             )
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq(
-                        'company_id',
-                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
-                    ),
-                    $qb->expr()->isNull('company_id')
-                )
-            )
+            ->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)))
             ->orderBy('booked_at', 'DESC');
 
         return $this->findEntities($qb);

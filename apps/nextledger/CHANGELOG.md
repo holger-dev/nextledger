@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 1.6.0
+- Add optional holding/group assignment for companies so related companies can be managed together in company settings
+- Show the holding/group directly in the company overview; this is an organizational grouping only, no consolidated balance sheet is introduced
+- Add two GÜB/EÜR PDF export variants: with or without Einzelauflistung
+- Add polished recovery/company-sharing user pickers with selectable Nextcloud users instead of manual user ID entry
+- Keep separate per-company exports as the intended path instead of consolidated statements
+- Restrict company and ledger data to users with explicit access instead of exposing all companies globally
+- Add a recovery dialog after update to assign legacy companies without owner to a Nextcloud user before entering the app
+- Allow inviting additional Nextcloud users to individual companies, including access to company-specific mail settings
+
 ## 1.5.1
 - Fix auto-stored PDF files in Nextcloud Files so generated invoice/offer PDFs open correctly
 - Improve invoice PDF versioning: one folder per invoice number, latest file without suffix, older files as `_v1`, `_v2`, ...

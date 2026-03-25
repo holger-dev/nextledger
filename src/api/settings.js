@@ -10,6 +10,8 @@ const del = (path) => axios.delete(generateUrl(`${base}/${path}`)).then((r) => r
 
 export const getCompany = () => get('company')
 export const saveCompany = (payload) => put('company', payload)
+export const getCompanyOwnershipRecovery = () => get('company-ownership-recovery')
+export const claimCompanyOwnershipRecovery = (payload) => post('company-ownership-recovery', payload)
 export const getCompanies = () => get('companies')
 export const createCompany = (payload) => post('companies', payload)
 export const activateCompany = (id) => put(`companies/${id}/activate`, {})

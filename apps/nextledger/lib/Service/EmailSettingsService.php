@@ -126,6 +126,9 @@ class EmailSettingsService {
                 if ($companyId <= 0) {
                     continue;
                 }
+                if (!$this->activeCompanyService->canAccessCompany($companyId)) {
+                    continue;
+                }
 
                 $entry = $this->emailSettingMapper->findByUserAndCompanyId($userId, $companyId) ?? new EmailSetting();
                 $entry->setUserId($userId);

@@ -21,6 +21,7 @@
         <table class="table">
           <thead>
             <tr>
+              <th>{{ t('groupName') }}</th>
               <th>{{ t('company') }}</th>
               <th>{{ t('owner') }}</th>
               <th>{{ t('status') }}</th>
@@ -29,6 +30,7 @@
           </thead>
           <tbody>
             <tr v-for="entry in companies" :key="entry.id">
+              <td>{{ entry.groupName || '—' }}</td>
               <td class="name">{{ entry.name || `${t('company')} #${entry.id}` }}</td>
               <td>{{ entry.ownerName || '—' }}</td>
               <td>
@@ -45,7 +47,7 @@
                 </NcButton>
                 <NcButton
                   type="tertiary"
-                  :disabled="switching || companies.length <= 1 || isActiveCompany(entry.id)"
+                  :disabled="switching || companies.length <= 1 || isActiveCompany(entry.id) || !entry.isOwner"
                   @click="deleteCompanyEntry(entry)"
                 >
                   {{ t('delete') }}
@@ -57,6 +59,8 @@
       </div>
 
       <NcTextField :label="t('company')" :value.sync="form.name" />
+      <NcTextField :label="t('groupName')" :value.sync="form.groupName" />
+      <p class="hint">{{ t('groupNameHint') }}</p>
       <NcTextField :label="t('ownerName')" :value.sync="form.ownerName" />
       <NcTextField :label="t('street')" :value.sync="form.street" />
       <NcTextField :label="t('houseNumber')" :value.sync="form.houseNumber" />
@@ -66,6 +70,36 @@
       <NcTextField :label="t('phone')" :value.sync="form.phone" />
       <NcTextField :label="t('vatId')" :value.sync="form.vatId" />
       <NcTextField :label="t('taxId')" :value.sync="form.taxId" />
+      <div v-if="canManageUsers" class="share-box">
+        <NcSelect
+          :value="selectedSharedUserId"
+          :options="sharedUserOptions"
+          :reduce="(option) => option.value"
+          :append-to-body="false"
+          :clearable="true"
+          :input-label="t('sharedUsers')"
+          :label-outside="true"
+          :placeholder="t('sharedUsersPlaceholder')"
+          @input="addSharedUser"
+        />
+        <div v-if="sharedUsersDisplay.length" class="shared-users-list">
+          <div
+            v-for="user in sharedUsersDisplay"
+            :key="user.userId"
+            class="shared-user-chip"
+          >
+            <span>{{ user.label }}</span>
+            <NcButton
+              type="tertiary-no-background"
+              :aria-label="t('removeSharedUser')"
+              @click="removeSharedUser(user.userId)"
+            >
+              {{ t('delete') }}
+            </NcButton>
+          </div>
+        </div>
+        <p class="hint">{{ t('sharedUsersHint') }}</p>
+      </div>
 
       <div class="form-actions">
         <NcButton type="primary" :disabled="saving" @click="save">
@@ -81,6 +115,7 @@
 
 <script>
 import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
+import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import {
   activateCompany,
@@ -96,6 +131,7 @@ export default {
   components: {
     NcButton,
     NcLoadingIcon,
+    NcSelect,
     NcTextField,
   },
   data() {
@@ -107,10 +143,15 @@ export default {
       saved: false,
       error: '',
       activeCompanyId: null,
+      canManageUsers: false,
+      availableUsers: [],
       companies: [],
       newCompanyName: '',
+      sharedUserIds: [],
+      selectedSharedUserId: '',
       form: {
         name: '',
+        groupName: '',
         ownerName: '',
         street: '',
         houseNumber: '',
@@ -126,9 +167,49 @@ export default {
   async mounted() {
     await this.load()
   },
+  computed: {
+    sharedUserOptions() {
+      return this.availableUsers
+        .filter((entry) => !this.sharedUserIds.includes(entry.userId))
+        .map((entry) => ({
+          value: entry.userId,
+          label: entry.label,
+        }))
+    },
+    sharedUsersDisplay() {
+      return this.sharedUserIds.map((userId) => {
+        const match = this.availableUsers.find((entry) => entry.userId === userId)
+        return {
+          userId,
+          label: match?.label || userId,
+        }
+      })
+    },
+  },
   methods: {
     t(key) {
       return this.$tKey(`settingsCompany.${key}`, key)
+    },
+    applyCompanyData(data) {
+      const safeString = (value) => (value === null || value === undefined ? '' : String(value))
+      this.form = {
+        ...this.form,
+        name: safeString(data.name),
+        groupName: safeString(data.groupName),
+        ownerName: safeString(data.ownerName),
+        street: safeString(data.street),
+        houseNumber: safeString(data.houseNumber),
+        zip: safeString(data.zip),
+        city: safeString(data.city),
+        email: safeString(data.email),
+        phone: safeString(data.phone),
+        vatId: safeString(data.vatId),
+        taxId: safeString(data.taxId),
+      }
+      this.canManageUsers = Boolean(data.canManageUsers)
+      this.availableUsers = Array.isArray(data.availableUsers) ? data.availableUsers : []
+      this.sharedUserIds = Array.isArray(data.sharedUserIds) ? data.sharedUserIds : []
+      this.selectedSharedUserId = ''
     },
     async load() {
       this.loading = true
@@ -149,20 +230,7 @@ export default {
     },
     async loadActiveCompany() {
       const data = await getCompany()
-      const safeString = (value) => (value === null || value === undefined ? '' : String(value))
-      this.form = {
-        ...this.form,
-        name: safeString(data.name),
-        ownerName: safeString(data.ownerName),
-        street: safeString(data.street),
-        houseNumber: safeString(data.houseNumber),
-        zip: safeString(data.zip),
-        city: safeString(data.city),
-        email: safeString(data.email),
-        phone: safeString(data.phone),
-        vatId: safeString(data.vatId),
-        taxId: safeString(data.taxId),
-      }
+      this.applyCompanyData(data)
     },
     isActiveCompany(id) {
       return Number(this.activeCompanyId) === Number(id)
@@ -233,8 +301,14 @@ export default {
       this.saved = false
       this.error = ''
       try {
-        const data = await saveCompany(this.form)
-        this.form = { ...this.form, ...data }
+        const payload = {
+          ...this.form,
+        }
+        if (this.canManageUsers) {
+          payload.sharedUserIds = this.sharedUserIds
+        }
+        const data = await saveCompany(payload)
+        this.applyCompanyData(data)
         await this.refreshCompanies()
         this.saved = true
         this.emitCompanyChanged()
@@ -250,6 +324,17 @@ export default {
     emitCompanyChanged() {
       window.dispatchEvent(new CustomEvent('nextledger-company-changed'))
     },
+    addSharedUser(userId) {
+      const value = String(userId || '').trim()
+      this.selectedSharedUserId = ''
+      if (!value || this.sharedUserIds.includes(value)) {
+        return
+      }
+      this.sharedUserIds = [...this.sharedUserIds, value]
+    },
+    removeSharedUser(userId) {
+      this.sharedUserIds = this.sharedUserIds.filter((entry) => entry !== userId)
+    },
   },
 }
 </script>
@@ -261,6 +346,28 @@ export default {
 
 .form > * {
   margin-bottom: 16px;
+}
+
+.share-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shared-users-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shared-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 999px;
+  background: var(--color-background-dark, #f7f9fb);
 }
 
 .company-list {

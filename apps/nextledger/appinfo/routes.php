@@ -8,6 +8,8 @@ return [
         ['name' => 'api#health', 'url' => '/api/health', 'verb' => 'GET'],
         ['name' => 'settings#getCompany', 'url' => '/api/settings/company', 'verb' => 'GET'],
         ['name' => 'settings#saveCompany', 'url' => '/api/settings/company', 'verb' => 'PUT'],
+        ['name' => 'settings#getCompanyOwnershipRecovery', 'url' => '/api/settings/company-ownership-recovery', 'verb' => 'GET'],
+        ['name' => 'settings#claimCompanyOwnershipRecovery', 'url' => '/api/settings/company-ownership-recovery', 'verb' => 'POST'],
         ['name' => 'settings#getCompanies', 'url' => '/api/settings/companies', 'verb' => 'GET'],
         ['name' => 'settings#createCompany', 'url' => '/api/settings/companies', 'verb' => 'POST'],
         ['name' => 'settings#activateCompany', 'url' => '/api/settings/companies/{id}/activate', 'verb' => 'PUT'],

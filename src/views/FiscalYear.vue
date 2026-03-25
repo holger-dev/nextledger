@@ -106,9 +106,14 @@
             <h2>{{ selectedYear.name }}</h2>
             <p class="subline">{{ formatRange(selectedYear.dateStart, selectedYear.dateEnd) }}</p>
           </div>
-          <NcButton type="secondary" @click="downloadGubPdf">
-            {{ t('exportGub') }}
-          </NcButton>
+          <div class="export-actions">
+            <NcButton type="secondary" @click="downloadGubPdf(false)">
+              {{ t('exportGubCompact') }}
+            </NcButton>
+            <NcButton type="secondary" @click="downloadGubPdf(true)">
+              {{ t('exportGubDetailed') }}
+            </NcButton>
+          </div>
         </div>
 
         <div class="gub-summary">
@@ -1077,11 +1082,11 @@ export default {
         this.saving = false
       }
     },
-    downloadGubPdf() {
+    downloadGubPdf(includeDetails = true) {
       if (!this.selectedYearId) {
         return
       }
-      const url = getGubPdfUrl(this.selectedYearId)
+      const url = getGubPdfUrl(this.selectedYearId, includeDetails)
       window.open(url, '_blank')
     },
     formatRange(start, end) {
@@ -1141,6 +1146,12 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .page-header h1 {

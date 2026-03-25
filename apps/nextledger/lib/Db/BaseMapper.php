@@ -55,15 +55,7 @@ abstract class BaseMapper extends QBMapper {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->tableName)
-            ->where(
-                $qb->expr()->orX(
-                    $qb->expr()->eq(
-                        'company_id',
-                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
-                    ),
-                    $qb->expr()->isNull('company_id')
-                )
-            );
+            ->where($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)));
 
         if ($limit > 0) {
             $qb->setMaxResults($limit);
@@ -84,15 +76,7 @@ abstract class BaseMapper extends QBMapper {
         $qb->select('*')
             ->from($this->tableName)
             ->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq(
-                        'company_id',
-                        $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)
-                    ),
-                    $qb->expr()->isNull('company_id')
-                )
-            );
+            ->andWhere($qb->expr()->eq('company_id', $qb->createNamedParameter($companyId, IQueryBuilder::PARAM_INT)));
 
         return $this->findEntity($qb);
     }

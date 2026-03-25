@@ -21,6 +21,7 @@ use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
+use OCP\IUserManager;
 
 class SettingsController extends ApiController {
     public function __construct(
@@ -33,6 +34,7 @@ class SettingsController extends ApiController {
         private DocumentSettingMapper $documentSettingMapper,
         private ActiveCompanyService $activeCompanyService,
         private EmailSettingsService $emailSettingsService,
+        private IUserManager $userManager,
     ) {
         parent::__construct($appName, $request);
     }
@@ -42,15 +44,69 @@ class SettingsController extends ApiController {
      * @NoCSRFRequired
      */
     public function getCompanies(): JSONResponse {
+        $legacyCompanies = $this->activeCompanyService->getLegacyCompanies();
         $companies = array_map(
-            fn(Company $company) => $this->entityToArray($company),
+            fn(Company $company) => $this->entityToCompanyArray($company),
             $this->activeCompanyService->getCompanies()
         );
 
         return new JSONResponse([
             'companies' => $companies,
             'activeCompanyId' => $this->activeCompanyService->getActiveCompanyId(),
+            'ownershipRecoveryRequired' => !empty($legacyCompanies),
+            'currentUserId' => $this->emailSettingsService->getCurrentUserId(),
+            'legacyCompanies' => array_map(function (Company $company): array {
+                return [
+                    'id' => (int)$company->getId(),
+                    'name' => (string)($company->getName() ?: ''),
+                    'groupName' => (string)($company->getGroupName() ?: ''),
+                    'ownerName' => (string)($company->getOwnerName() ?: ''),
+                ];
+            }, $legacyCompanies),
         ]);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function getCompanyOwnershipRecovery(): JSONResponse {
+        $legacyCompanies = $this->activeCompanyService->getLegacyCompanies();
+        $companies = array_map(function (Company $company): array {
+            return [
+                'id' => (int)$company->getId(),
+                'name' => (string)($company->getName() ?: ''),
+                'groupName' => (string)($company->getGroupName() ?: ''),
+                'ownerName' => (string)($company->getOwnerName() ?: ''),
+            ];
+        }, $legacyCompanies);
+
+        return new JSONResponse([
+            'required' => !empty($companies),
+            'currentUserId' => $this->emailSettingsService->getCurrentUserId(),
+            'companies' => $companies,
+            'availableUsers' => $this->listAvailableUsers(),
+        ]);
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function claimCompanyOwnershipRecovery(?string $userId = null): JSONResponse {
+        $params = $this->request->getParams();
+        if ($userId === null) {
+            $userId = $params['userId'] ?? null;
+        }
+
+        try {
+            $targetUserId = trim((string)($userId ?: $this->emailSettingsService->getCurrentUserId() ?: ''));
+            $this->activeCompanyService->assignLegacyCompaniesToUser($targetUserId);
+        } catch (\InvalidArgumentException $e) {
+            return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        }
+
+        return $this->getCompanyOwnershipRecovery();
     }
 
     /**
@@ -59,6 +115,8 @@ class SettingsController extends ApiController {
      */
     public function createCompany(
         ?string $name = null,
+        ?string $groupName = null,
+        ?array $sharedUserIds = null,
         ?string $ownerName = null,
         ?string $street = null,
         ?string $houseNumber = null,
@@ -71,6 +129,8 @@ class SettingsController extends ApiController {
     ): JSONResponse {
         $company = new Company();
         $company->setName($name ?: 'Neue Firma');
+        $company->setGroupName($groupName);
+        $company->setOwnerUserId($this->emailSettingsService->getCurrentUserId());
         $company->setOwnerName($ownerName);
         $company->setStreet($street);
         $company->setHouseNumber($houseNumber);
@@ -83,9 +143,13 @@ class SettingsController extends ApiController {
 
         /** @var Company $saved */
         $saved = $this->companyMapper->insert($company);
+        if (is_array($sharedUserIds)) {
+            $this->activeCompanyService->setActiveCompanyId((int)$saved->getId());
+            $this->activeCompanyService->saveSharedUserIds((int)$saved->getId(), $sharedUserIds);
+        }
         $this->activeCompanyService->setActiveCompanyId((int)$saved->getId());
 
-        return new JSONResponse($this->entityToArray($saved));
+        return new JSONResponse($this->entityToCompanyArray($saved));
     }
 
     /**
@@ -99,7 +163,7 @@ class SettingsController extends ApiController {
             return new JSONResponse(['message' => 'Firma nicht gefunden.'], Http::STATUS_NOT_FOUND);
         }
 
-        return new JSONResponse($this->entityToArray($company));
+        return new JSONResponse($this->entityToCompanyArray($company));
     }
 
     /**
@@ -128,6 +192,10 @@ class SettingsController extends ApiController {
         if ($activeId === $companyId) {
             return new JSONResponse(['message' => 'Aktive Firma kann nicht gelöscht werden.'], Http::STATUS_BAD_REQUEST);
         }
+        if (!$this->activeCompanyService->canManageCompanyUsers($companyId)) {
+            return new JSONResponse(['message' => 'Keine Berechtigung zum Löschen der Firma.'], Http::STATUS_FORBIDDEN);
+        }
+        $this->activeCompanyService->deleteCompanyShares($companyId);
         $this->companyMapper->delete($target);
 
         return new JSONResponse(['status' => 'ok']);
@@ -138,8 +206,13 @@ class SettingsController extends ApiController {
      * @NoCSRFRequired
      */
     public function getCompany(): JSONResponse {
-        $company = $this->activeCompanyService->getActiveCompany();
-        return new JSONResponse($this->entityToArray($company));
+        try {
+            $company = $this->activeCompanyService->getActiveCompany();
+        } catch (\InvalidArgumentException $e) {
+            return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_CONFLICT);
+        }
+
+        return new JSONResponse($this->entityToCompanyArray($company));
     }
 
     /**
@@ -148,6 +221,8 @@ class SettingsController extends ApiController {
      */
     public function saveCompany(
         ?string $name = null,
+        ?string $groupName = null,
+        ?array $sharedUserIds = null,
         ?string $ownerName = null,
         ?string $street = null,
         ?string $houseNumber = null,
@@ -160,6 +235,7 @@ class SettingsController extends ApiController {
     ): JSONResponse {
         $company = $this->activeCompanyService->getActiveCompany();
         $company->setName($name);
+        $company->setGroupName($groupName);
         $company->setOwnerName($ownerName);
         $company->setStreet($street);
         $company->setHouseNumber($houseNumber);
@@ -171,8 +247,11 @@ class SettingsController extends ApiController {
         $company->setTaxId($taxId);
         /** @var Company $saved */
         $saved = $this->companyMapper->update($company);
+        if (is_array($sharedUserIds)) {
+            $this->activeCompanyService->saveSharedUserIds((int)$saved->getId(), $sharedUserIds);
+        }
 
-        return new JSONResponse($this->entityToArray($saved));
+        return new JSONResponse($this->entityToCompanyArray($saved));
     }
 
     /**
@@ -418,5 +497,34 @@ class SettingsController extends ApiController {
 
         // NC 32 Entity has public properties but no jsonSerialize
         return get_object_vars($entity);
+    }
+
+    private function entityToCompanyArray(Company $company): array {
+        $data = $this->entityToArray($company);
+        $companyId = (int)($company->getId() ?? 0);
+        $data['sharedUserIds'] = $companyId > 0 ? $this->activeCompanyService->getSharedUserIds($companyId) : [];
+        $data['canManageUsers'] = $companyId > 0 ? $this->activeCompanyService->canManageCompanyUsers($companyId) : false;
+        $data['isOwner'] = $data['canManageUsers'];
+        $data['availableUsers'] = $this->listAvailableUsers();
+
+        return $data;
+    }
+
+    private function listAvailableUsers(): array {
+        $users = $this->userManager->search('');
+        $result = array_map(function ($user): array {
+            $userId = method_exists($user, 'getUID') ? (string)$user->getUID() : '';
+            $displayName = method_exists($user, 'getDisplayName') ? (string)$user->getDisplayName() : '';
+
+            return [
+                'userId' => $userId,
+                'label' => $displayName !== '' && $displayName !== $userId
+                    ? sprintf('%s (%s)', $displayName, $userId)
+                    : $userId,
+            ];
+        }, $users);
+
+        usort($result, static fn(array $a, array $b): int => strcasecmp((string)$a['label'], (string)$b['label']));
+        return array_values(array_filter($result, static fn(array $entry): bool => (string)($entry['userId'] ?? '') !== ''));
     }
 }
