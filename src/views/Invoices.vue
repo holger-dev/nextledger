@@ -634,13 +634,7 @@ export default {
       return date.toLocaleDateString('de-DE')
     },
     formatPrice(value) {
-      if (value === null || value === undefined) {
-        return '–'
-      }
-      return `${(Number(value) / 100).toLocaleString('de-DE', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })} €`
+      return this.$formatCurrencyCents(value)
     },
     statusLabel(status) {
       if (status === 'paid') {

@@ -6,6 +6,8 @@ namespace OCA\NextLedger\Service;
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use OCA\NextLedger\Db\Company;
+use OCA\NextLedger\Db\CompanyMapper;
 use OCA\NextLedger\Db\Expense;
 use OCA\NextLedger\Db\ExpenseMapper;
 use OCA\NextLedger\Db\FiscalYear;
@@ -26,6 +28,7 @@ class GubPdfService {
         private FiscalYearMapper $fiscalYearMapper,
         private IncomeMapper $incomeMapper,
         private ExpenseMapper $expenseMapper,
+        private CompanyMapper $companyMapper,
         private ActiveCompanyService $activeCompanyService,
         private IConfig $config,
         private IUserSession $userSession,
@@ -38,10 +41,11 @@ class GubPdfService {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         /** @var FiscalYear $year */
         $year = $this->fiscalYearMapper->findByIdAndCompanyId($fiscalYearId, $companyId);
+        $company = $this->loadCompany($companyId);
         $incomes = $this->incomeMapper->findByFiscalYearId($fiscalYearId, $companyId);
         $expenses = $this->expenseMapper->findByFiscalYearId($fiscalYearId, $companyId);
 
-        $html = $this->renderHtml($year, $incomes, $expenses, $includeDetails);
+        $html = $this->renderHtml($year, $incomes, $expenses, $includeDetails, $company?->getCurrencyCode());
         $content = $this->renderPdf($html);
         $filename = sprintf(
             'gub-%s%s.pdf',
@@ -76,7 +80,7 @@ class GubPdfService {
      * @param Income[] $incomes
      * @param Expense[] $expenses
      */
-    private function renderHtml(FiscalYear $year, array $incomes, array $expenses, bool $includeDetails): string {
+    private function renderHtml(FiscalYear $year, array $incomes, array $expenses, bool $includeDetails, ?string $currencyCode = null): string {
         $range = $this->formatRange($year->getDateStart(), $year->getDateEnd());
         $incomeRows = '';
         $incomeTotal = 0;
@@ -87,7 +91,7 @@ class GubPdfService {
                 '<tr><td>%s</td><td>%s</td><td style="text-align:right">%s</td><td>%s</td></tr>',
                 $this->escape($incomeName),
                 $this->formatDate($income->getBookedAt()),
-                $this->formatMoney($income->getAmountCents()),
+                $this->formatMoney($income->getAmountCents(), $currencyCode),
                 $this->escape($income->getStatus() ?: 'offen')
             );
         }
@@ -100,7 +104,7 @@ class GubPdfService {
                 '<tr><td>%s</td><td>%s</td><td style="text-align:right">%s</td></tr>',
                 $this->escape($expense->getName() ?: 'Ausgabe'),
                 $this->formatDate($expense->getBookedAt()),
-                $this->formatMoney($expense->getAmountCents())
+                $this->formatMoney($expense->getAmountCents(), $currencyCode)
             );
         }
 
@@ -139,6 +143,15 @@ class GubPdfService {
             $detailSections = '<p>Export ohne Einzelauflistung. Die Summen können bei Bedarf über die EÜR-Exporte je Firma weiterverwendet werden.</p>';
         }
 
+        $summaryRows = sprintf(
+            '<tr><th>Einnahmen gesamt</th><td>%s</td></tr>
+            <tr><th>Ausgaben gesamt</th><td>%s</td></tr>
+            <tr class="summary-table__result"><th>Gewinn/Überschuss</th><td>%s</td></tr>',
+            $this->formatMoney($incomeTotal, $currencyCode),
+            $this->formatMoney($expenseTotal, $currencyCode),
+            $this->formatMoney($profit, $currencyCode)
+        );
+
         return sprintf(
             '<html><head><meta charset="UTF-8"><style>
                 body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #1f2933; }
@@ -147,26 +160,24 @@ class GubPdfService {
                 th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 4px; vertical-align: top; }
                 th { text-align: left; background: #f3f4f6; }
                 .section-title { margin-top: 16px; font-size: 14px; font-weight: 600; }
-                .totals { margin-top: 12px; text-align: right; }
+                .summary-table { margin-top: 20px; }
+                .summary-table th { width: 60%%; }
+                .summary-table td { text-align: right; font-weight: 600; }
+                .summary-table__result th, .summary-table__result td { background: #eef4ff; font-weight: 700; }
             </style></head><body>
             <h1>GÜB %s</h1>
             <p>Zeitraum: %s</p>
             <p>Einzelauflistung: %s</p>
             %s
-
-            <div class="totals">
-              <p>Einnahmen gesamt: %s</p>
-              <p>Ausgaben gesamt: %s</p>
-              <p><strong>Gewinn/Überschuss: %s</strong></p>
-            </div>
+            <table class="summary-table">
+              <tbody>%s</tbody>
+            </table>
             </body></html>',
             $this->escape($year->getName() ?: ''),
             $this->escape($range),
             $includeDetails ? 'mit' : 'ohne',
             $detailSections,
-            $this->formatMoney($incomeTotal),
-            $this->formatMoney($expenseTotal),
-            $this->formatMoney($profit)
+            $summaryRows
         );
     }
 
@@ -207,10 +218,32 @@ class GubPdfService {
         return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    private function formatMoney(?int $cents): string {
+    private function formatMoney(?int $cents, ?string $currencyCode = null): string {
         if ($cents === null) {
             return '–';
         }
-        return number_format($cents / 100, 2, ',', '.') . ' €';
+        $currency = strtoupper(trim((string)($currencyCode ?? '')));
+        if ($currency === '') {
+            $currency = 'EUR';
+        }
+
+        $amount = number_format($cents / 100, 2, ',', '.');
+        return match ($currency) {
+            'EUR' => $amount . ' €',
+            'USD' => '$' . $amount,
+            'GBP' => '£' . $amount,
+            'CHF' => $amount . ' CHF',
+            default => $amount . ' ' . $currency,
+        };
+    }
+
+    private function loadCompany(int $companyId): ?Company {
+        try {
+            /** @var Company $company */
+            $company = $this->companyMapper->find($companyId);
+            return $company;
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return null;
+        }
     }
 }

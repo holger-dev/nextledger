@@ -116,6 +116,7 @@ class SettingsController extends ApiController {
     public function createCompany(
         ?string $name = null,
         ?string $groupName = null,
+        ?string $currencyCode = null,
         ?array $sharedUserIds = null,
         ?string $ownerName = null,
         ?string $street = null,
@@ -130,6 +131,7 @@ class SettingsController extends ApiController {
         $company = new Company();
         $company->setName($name ?: 'Neue Firma');
         $company->setGroupName($groupName);
+        $company->setCurrencyCode($this->normalizeCurrencyCode($currencyCode));
         $company->setOwnerUserId($this->emailSettingsService->getCurrentUserId());
         $company->setOwnerName($ownerName);
         $company->setStreet($street);
@@ -222,6 +224,7 @@ class SettingsController extends ApiController {
     public function saveCompany(
         ?string $name = null,
         ?string $groupName = null,
+        ?string $currencyCode = null,
         ?array $sharedUserIds = null,
         ?string $ownerName = null,
         ?string $street = null,
@@ -236,6 +239,7 @@ class SettingsController extends ApiController {
         $company = $this->activeCompanyService->getActiveCompany();
         $company->setName($name);
         $company->setGroupName($groupName);
+        $company->setCurrencyCode($this->normalizeCurrencyCode($currencyCode));
         $company->setOwnerName($ownerName);
         $company->setStreet($street);
         $company->setHouseNumber($houseNumber);
@@ -502,6 +506,7 @@ class SettingsController extends ApiController {
     private function entityToCompanyArray(Company $company): array {
         $data = $this->entityToArray($company);
         $companyId = (int)($company->getId() ?? 0);
+        $data['currencyCode'] = $this->normalizeCurrencyCode($data['currencyCode'] ?? null);
         $data['sharedUserIds'] = $companyId > 0 ? $this->activeCompanyService->getSharedUserIds($companyId) : [];
         $data['canManageUsers'] = $companyId > 0 ? $this->activeCompanyService->canManageCompanyUsers($companyId) : false;
         $data['isOwner'] = $data['canManageUsers'];
@@ -526,5 +531,10 @@ class SettingsController extends ApiController {
 
         usort($result, static fn(array $a, array $b): int => strcasecmp((string)$a['label'], (string)$b['label']));
         return array_values(array_filter($result, static fn(array $entry): bool => (string)($entry['userId'] ?? '') !== ''));
+    }
+
+    private function normalizeCurrencyCode(?string $value): string {
+        $normalized = strtoupper(trim((string)($value ?? '')));
+        return $normalized !== '' ? $normalized : 'EUR';
     }
 }

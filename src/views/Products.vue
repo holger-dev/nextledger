@@ -329,17 +329,7 @@ export default {
       }
     },
     formatPrice(value) {
-      if (value === null || value === undefined || value === '') {
-        return '–'
-      }
-      const amount = Number(value)
-      if (Number.isNaN(amount)) {
-        return String(value)
-      }
-      return (amount / 100).toLocaleString('de-DE', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
+      return this.$formatCurrencyCents(value)
     },
   },
 }

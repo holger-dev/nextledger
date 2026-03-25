@@ -70,6 +70,17 @@
       <NcTextField :label="t('phone')" :value.sync="form.phone" />
       <NcTextField :label="t('vatId')" :value.sync="form.vatId" />
       <NcTextField :label="t('taxId')" :value.sync="form.taxId" />
+      <NcSelect
+        :value="form.currencyCode"
+        :options="currencyOptions"
+        :reduce="(option) => option.value"
+        :append-to-body="false"
+        :clearable="false"
+        :input-label="t('currencyCode')"
+        :label-outside="true"
+        @input="form.currencyCode = $event"
+      />
+      <p class="hint">{{ t('currencyCodeHint') }}</p>
       <div v-if="canManageUsers" class="share-box">
         <NcSelect
           :value="selectedSharedUserId"
@@ -161,6 +172,7 @@ export default {
         phone: '',
         vatId: '',
         taxId: '',
+        currencyCode: 'EUR',
       },
     }
   },
@@ -168,6 +180,14 @@ export default {
     await this.load()
   },
   computed: {
+    currencyOptions() {
+      return [
+        { value: 'EUR', label: 'Euro (EUR)' },
+        { value: 'USD', label: 'US-Dollar (USD)' },
+        { value: 'CHF', label: 'Schweizer Franken (CHF)' },
+        { value: 'GBP', label: 'Pfund Sterling (GBP)' },
+      ]
+    },
     sharedUserOptions() {
       return this.availableUsers
         .filter((entry) => !this.sharedUserIds.includes(entry.userId))
@@ -205,6 +225,7 @@ export default {
         phone: safeString(data.phone),
         vatId: safeString(data.vatId),
         taxId: safeString(data.taxId),
+        currencyCode: safeString(data.currencyCode || 'EUR'),
       }
       this.canManageUsers = Boolean(data.canManageUsers)
       this.availableUsers = Array.isArray(data.availableUsers) ? data.availableUsers : []

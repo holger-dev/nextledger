@@ -34,18 +34,23 @@
 
     <div v-else class="content">
       <div v-if="!standalone" class="filters">
-        <label for="customerFilter">{{ t('customer') }}</label>
-        <NcSelect
-          id="customerFilter"
-          v-model="filterCustomerId"
-          :options="customerFilterOptions"
-          :reduce="(option) => option.value"
-          :append-to-body="false"
-          :clearable="true"
-          :input-label="t('customer')"
-          :label-outside="true"
-          :placeholder="t('allCustomers')"
-        />
+        <div class="filters__select">
+          <label for="customerFilter">{{ t('customer') }}</label>
+          <NcSelect
+            id="customerFilter"
+            v-model="filterCustomerId"
+            :options="customerFilterOptions"
+            :reduce="(option) => option.value"
+            :append-to-body="false"
+            :clearable="true"
+            :input-label="t('customer')"
+            :label-outside="true"
+            :placeholder="t('allCustomers')"
+          />
+        </div>
+        <NcButton type="secondary" @click="toggleArchiveMode">
+          {{ showArchived ? t('showActiveCases') : t('showArchivedCases') }}
+        </NcButton>
       </div>
 
       <NcEmptyContent
@@ -66,6 +71,7 @@
                 <span>{{ customerName(item.customerId) }}</span>
                 <span v-if="item.description">• {{ item.description }}</span>
               </p>
+              <p v-if="item.isArchived" class="case-archive-note">{{ t('archivedBadge') }}</p>
             </div>
             <div class="case-actions">
               <NcButton v-if="!standalone" type="tertiary" @click="openCaseDetail(item)">
@@ -80,6 +86,14 @@
                 <template #icon>
                   <Pencil :size="18" />
                 </template>
+              </NcButton>
+              <NcButton
+                type="tertiary-no-background"
+                :aria-label="item.isArchived ? t('unarchiveCase') : t('archiveCase')"
+                :title="item.isArchived ? t('restore') : t('archive')"
+                @click="toggleArchive(item)"
+              >
+                {{ item.isArchived ? t('restore') : t('archive') }}
               </NcButton>
               <NcButton
                 type="tertiary-no-background"
@@ -724,6 +738,7 @@ export default {
       items: [],
       customers: [],
       filterCustomerId: '',
+      showArchived: false,
       editingId: null,
       expandedId: null,
       showCaseModal: false,
@@ -849,6 +864,9 @@ export default {
     filterCustomerId() {
       this.loadCases()
     },
+    showArchived() {
+      this.loadCases()
+    },
     '$route.query.caseId': {
       handler() {
         if (!this.standalone) {
@@ -933,7 +951,7 @@ export default {
       try {
         const [customers, cases, texts, emailBehavior, company, fiscalYears] = await Promise.all([
           getCustomers(),
-          getCases(this.filterCustomerId),
+          getCases(this.filterCustomerId, this.currentArchiveFilter()),
           getTexts(),
           getEmailBehavior(),
           getCompany(),
@@ -954,7 +972,7 @@ export default {
       this.loading = true
       this.error = ''
       try {
-        const data = await getCases(this.filterCustomerId)
+        const data = await getCases(this.filterCustomerId, this.currentArchiveFilter())
         this.items = Array.isArray(data) ? data : []
         if (this.expandedId && !this.items.find((item) => item.id === this.expandedId)) {
           this.expandedId = null
@@ -1391,7 +1409,6 @@ export default {
     },
     openEditModal(item) {
       this.editingId = item.id
-      const customer = this.customers.find((entry) => entry.id === item.customerId)
       this.form = {
         customerId: item.customerId ? String(item.customerId) : '',
         name: item.name || '',
@@ -1475,6 +1492,41 @@ export default {
         this.saving = false
       }
     },
+    async toggleArchive(item) {
+      const shouldArchive = !item.isArchived
+      const confirmText = shouldArchive ? this.t('archiveCaseConfirm') : this.t('restoreCaseConfirm')
+      if (!window.confirm(confirmText)) {
+        return
+      }
+
+      try {
+        const saved = await updateCase(item.id, {
+          customerId: item.customerId ?? null,
+          name: item.name || '',
+          description: item.description || '',
+          deckLink: item.deckLink || '',
+          kollektivLink: item.kollektivLink || '',
+          isArchived: shouldArchive,
+        })
+        this.items = this.items
+          .map((entry) => (entry.id === item.id ? saved : entry))
+          .filter((entry) => Boolean(entry.isArchived) === this.showArchived)
+        if (this.expandedId === item.id && shouldArchive !== this.showArchived) {
+          this.expandedId = null
+        }
+      } catch (e) {
+        this.error = this.t('archiveError')
+      }
+    },
+    toggleArchiveMode() {
+      this.showArchived = !this.showArchived
+    },
+    currentArchiveFilter() {
+      if (this.standalone && this.focusCaseId) {
+        return 'all'
+      }
+      return this.showArchived ? 'archived' : 'active'
+    },
     async toggleExpand(item) {
       if (this.expandedId === item.id) {
         this.expandedId = null
@@ -1495,13 +1547,7 @@ export default {
       ])
     },
     formatPrice(value) {
-      if (value === null || value === undefined) {
-        return '–'
-      }
-      return `${(Number(value) / 100).toLocaleString('de-DE', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })} €`
+      return this.$formatCurrencyCents(value)
     },
     formatDate(value) {
       if (!value) {
@@ -1815,6 +1861,15 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filters__select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 280px;
 }
 
 .filters label,
@@ -1879,6 +1934,13 @@ export default {
   margin: 2px 0 0;
   color: var(--color-text-lighter, #6b7280);
   font-size: 13px;
+}
+
+.case-archive-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-lighter, #6b7280);
 }
 
 .case-actions {

@@ -135,15 +135,15 @@ class InvoicePdfService {
                 $this->escape($item->getName()),
                 $this->escape($item->getDescription()),
                 $this->escape((string)($item->getQuantity() ?? 0)),
-                $this->formatMoney($item->getUnitPriceCents()),
-                $this->formatMoney($item->getTotalCents())
+                $this->formatMoney($item->getUnitPriceCents(), $company?->getCurrencyCode()),
+                $this->formatMoney($item->getTotalCents(), $company?->getCurrencyCode())
             );
         }
 
         $taxLine = $invoice->getIsSmallBusiness()
             ? ($tax?->getSmallBusinessNote() ?: 'Kleinunternehmerregelung')
             : sprintf('Steuer (%s%%)', number_format(($invoice->getTaxRateBp() ?? 0) / 100, 2, ',', '.'));
-        $taxAmount = $invoice->getIsSmallBusiness() ? '' : $this->formatMoney($invoice->getTaxCents());
+        $taxAmount = $invoice->getIsSmallBusiness() ? '' : $this->formatMoney($invoice->getTaxCents(), $company?->getCurrencyCode());
 
         $footerText = $invoice->getFooterText() ?? $texts?->getFooterText() ?? '';
         $greeting = $invoice->getGreetingText() ?? $texts?->getInvoiceGreeting() ?? '';
@@ -285,10 +285,10 @@ class InvoicePdfService {
             nl2br($this->escape($greeting)),
             nl2br($this->escape($extraText)),
             $rows,
-            $this->formatMoney($invoice->getSubtotalCents()),
+            $this->formatMoney($invoice->getSubtotalCents(), $company?->getCurrencyCode()),
             $this->escape($taxLine),
             $taxAmount ? ': ' . $taxAmount : '',
-            $this->formatMoney($invoice->getTotalCents()),
+            $this->formatMoney($invoice->getTotalCents(), $company?->getCurrencyCode()),
             $closingTextBlock,
             $closingBlock
         );
@@ -306,11 +306,23 @@ class InvoicePdfService {
         return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    private function formatMoney(?int $cents): string {
+    private function formatMoney(?int $cents, ?string $currencyCode = null): string {
         if ($cents === null) {
             return '–';
         }
-        return number_format($cents / 100, 2, ',', '.') . ' €';
+        $currency = strtoupper(trim((string)($currencyCode ?? '')));
+        if ($currency === '') {
+            $currency = 'EUR';
+        }
+
+        $amount = number_format($cents / 100, 2, ',', '.');
+        return match ($currency) {
+            'EUR' => $amount . ' €',
+            'USD' => '$' . $amount,
+            'GBP' => '£' . $amount,
+            'CHF' => $amount . ' CHF',
+            default => $amount . ' ' . $currency,
+        };
     }
 
     private function loadCustomer(?int $customerId, int $companyId): ?Customer {

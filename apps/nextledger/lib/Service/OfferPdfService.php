@@ -130,15 +130,15 @@ class OfferPdfService {
                 $this->escape($item->getName()),
                 $this->escape($item->getDescription()),
                 $this->escape((string)($item->getQuantity() ?? 0)),
-                $this->formatMoney($item->getUnitPriceCents()),
-                $this->formatMoney($item->getTotalCents())
+                $this->formatMoney($item->getUnitPriceCents(), $company?->getCurrencyCode()),
+                $this->formatMoney($item->getTotalCents(), $company?->getCurrencyCode())
             );
         }
 
         $taxLine = $offer->getIsSmallBusiness()
             ? ($tax?->getSmallBusinessNote() ?: 'Kleinunternehmerregelung')
             : sprintf('Steuer (%s%%)', number_format(($offer->getTaxRateBp() ?? 0) / 100, 2, ',', '.'));
-        $taxAmount = $offer->getIsSmallBusiness() ? '' : $this->formatMoney($offer->getTaxCents());
+        $taxAmount = $offer->getIsSmallBusiness() ? '' : $this->formatMoney($offer->getTaxCents(), $company?->getCurrencyCode());
 
         $footerText = $texts?->getFooterText() ?? '';
         $greeting = $offer->getGreetingText() ?? $texts?->getOfferGreeting() ?? '';
@@ -208,10 +208,10 @@ class OfferPdfService {
             nl2br($this->escape($greeting)),
             nl2br($this->escape($extraText)),
             $rows,
-            $this->formatMoney($offer->getSubtotalCents()),
+            $this->formatMoney($offer->getSubtotalCents(), $company?->getCurrencyCode()),
             $this->escape($taxLine),
             $taxAmount ? ': ' . $taxAmount : '',
-            $this->formatMoney($offer->getTotalCents()),
+            $this->formatMoney($offer->getTotalCents(), $company?->getCurrencyCode()),
             $closingTextBlock,
             $closingBlock,
             nl2br($this->escape($footerText)),
@@ -223,11 +223,23 @@ class OfferPdfService {
         return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    private function formatMoney(?int $cents): string {
+    private function formatMoney(?int $cents, ?string $currencyCode = null): string {
         if ($cents === null) {
             return '–';
         }
-        return number_format($cents / 100, 2, ',', '.') . ' €';
+        $currency = strtoupper(trim((string)($currencyCode ?? '')));
+        if ($currency === '') {
+            $currency = 'EUR';
+        }
+
+        $amount = number_format($cents / 100, 2, ',', '.');
+        return match ($currency) {
+            'EUR' => $amount . ' €',
+            'USD' => '$' . $amount,
+            'GBP' => '£' . $amount,
+            'CHF' => $amount . ' CHF',
+            default => $amount . ' ' . $currency,
+        };
     }
 
     private function loadCustomer(?int $customerId, int $companyId): ?Customer {

@@ -12,6 +12,8 @@
 - Add a recovery dialog after update to assign legacy companies without owner to a Nextcloud user before entering the app
 - Allow inviting additional Nextcloud users to individual companies, including access to company-specific mail settings
 - Add an optional free invoice field (label + value) and render the invoice footer/bank details as a repeated footer on every PDF page
+- Add a per-company currency setting (default EUR) and use it consistently in lists, forms, invoices, offers, and GÜB PDFs
+- Add case archiving with a dedicated archive toggle in the case overview, plus improved GÜB summary tables for both export variants
 
 ## 1.5.1
 - Fix auto-stored PDF files in Nextcloud Files so generated invoice/offer PDFs open correctly

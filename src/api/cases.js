@@ -3,10 +3,13 @@ import { generateUrl } from '@nextcloud/router'
 
 const base = '/apps/nextledger/api/cases'
 
-export const getCases = (customerId = null) => {
+export const getCases = (customerId = null, archived = 'active') => {
   const params = {}
   if (customerId !== null && customerId !== undefined && customerId !== '') {
     params.customerId = customerId
+  }
+  if (archived) {
+    params.archived = archived
   }
   return axios.get(generateUrl(base), { params }).then((r) => r.data)
 }

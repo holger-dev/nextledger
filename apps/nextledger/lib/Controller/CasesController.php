@@ -32,16 +32,21 @@ class CasesController extends ApiController {
      * @NoAdminRequired
      * @NoCSRFRequired
      */
-    public function list(?string $customerId = null): JSONResponse {
+    public function list(?string $customerId = null, ?string $archived = null): JSONResponse {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $filter = null;
         if ($customerId !== null && $customerId !== '') {
             $filter = (int)$customerId;
         }
+        $archiveFilter = $this->parseArchiveFilter($archived);
 
         $items = $filter === null
             ? $this->caseMapper->findAllByCompanyId($companyId)
             : $this->caseMapper->findByCustomerId($filter, $companyId);
+        $items = array_values(array_filter(
+            $items,
+            fn(CaseEntity $case): bool => $this->matchesArchiveFilter($case, $archiveFilter)
+        ));
 
         $data = array_map(fn(CaseEntity $case) => $this->entityToArray($case), $items);
         usort($data, static fn(array $a, array $b) => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
@@ -73,6 +78,7 @@ class CasesController extends ApiController {
         $case->setCaseNumber($this->generateCaseNumber($companyId));
         $case->setDeckLink($deckLink);
         $case->setKollektivLink($kollektivLink);
+        $case->setIsArchived(false);
         $case->setCreatedAt(time());
         $case->setUpdatedAt(time());
 
@@ -91,6 +97,7 @@ class CasesController extends ApiController {
         ?string $description = null,
         ?string $deckLink = null,
         ?string $kollektivLink = null,
+        ?bool $isArchived = null,
     ): JSONResponse {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $caseId = (int)$id;
@@ -111,6 +118,7 @@ class CasesController extends ApiController {
         $case->setDescription($description);
         $case->setDeckLink($deckLink);
         $case->setKollektivLink($kollektivLink);
+        $case->setIsArchived($isArchived ?? (bool)$case->getIsArchived());
         $case->setUpdatedAt(time());
 
         $saved = $this->caseMapper->update($case);
@@ -161,5 +169,25 @@ class CasesController extends ApiController {
         $running = str_pad((string)$counter->getCounterValue(), 3, '0', STR_PAD_LEFT);
 
         return sprintf('%s-%s', $dateKey, $running);
+    }
+
+    private function parseArchiveFilter(?string $value): string {
+        $normalized = strtolower(trim((string)($value ?? '')));
+        if ($normalized === '1' || $normalized === 'true' || $normalized === 'archived') {
+            return 'archived';
+        }
+        if ($normalized === 'all') {
+            return 'all';
+        }
+        return 'active';
+    }
+
+    private function matchesArchiveFilter(CaseEntity $case, string $archiveFilter): bool {
+        $isArchived = (bool)$case->getIsArchived();
+        return match ($archiveFilter) {
+            'archived' => $isArchived,
+            'all' => true,
+            default => !$isArchived,
+        };
     }
 }

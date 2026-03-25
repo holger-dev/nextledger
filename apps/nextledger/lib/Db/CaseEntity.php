@@ -15,6 +15,7 @@ class CaseEntity extends Entity {
     public $caseNumber;
     public $deckLink;
     public $kollektivLink;
+    public $isArchived;
     public $createdAt;
     public $updatedAt;
 
@@ -26,6 +27,7 @@ class CaseEntity extends Entity {
         $this->addType('caseNumber', 'string');
         $this->addType('deckLink', 'string');
         $this->addType('kollektivLink', 'string');
+        $this->addType('isArchived', 'boolean');
         $this->addType('createdAt', 'integer');
         $this->addType('updatedAt', 'integer');
     }

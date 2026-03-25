@@ -108,6 +108,7 @@ import {
   getCompanies,
   getCompanyOwnershipRecovery,
 } from './api/settings'
+import { setActiveCurrencyCode } from './utils/currency'
 
 export default {
   name: 'NextLedgerApp',
@@ -217,14 +218,17 @@ export default {
           this.ownershipRecovery.userId = String(data.currentUserId || this.ownershipRecovery.userId || '')
           this.ownershipRecovery.availableUsers = Array.isArray(data.availableUsers) ? data.availableUsers : this.ownershipRecovery.availableUsers
           this.activeCompanyName = ''
+          setActiveCurrencyCode('EUR')
           return
         }
         const activeId = Number(data.activeCompanyId)
         const companies = Array.isArray(data.companies) ? data.companies : []
         const active = companies.find((entry) => Number(entry.id) === activeId)
         this.activeCompanyName = active?.name ? String(active.name) : ''
+        setActiveCurrencyCode(active?.currencyCode || 'EUR')
       } catch (e) {
         this.activeCompanyName = ''
+        setActiveCurrencyCode('EUR')
       }
     },
   },
