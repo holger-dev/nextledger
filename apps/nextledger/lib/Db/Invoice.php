@@ -22,6 +22,8 @@ class Invoice extends Entity {
     public $greetingText;
     public $extraText;
     public $footerText;
+    public $customFieldLabel;
+    public $customFieldValue;
     public $subtotalCents;
     public $taxCents;
     public $totalCents;
@@ -45,6 +47,8 @@ class Invoice extends Entity {
         $this->addType('greetingText', 'text');
         $this->addType('extraText', 'text');
         $this->addType('footerText', 'text');
+        $this->addType('customFieldLabel', 'string');
+        $this->addType('customFieldValue', 'string');
         $this->addType('subtotalCents', 'integer');
         $this->addType('taxCents', 'integer');
         $this->addType('totalCents', 'integer');

@@ -145,9 +145,19 @@ class InvoicePdfService {
             : sprintf('Steuer (%s%%)', number_format(($invoice->getTaxRateBp() ?? 0) / 100, 2, ',', '.'));
         $taxAmount = $invoice->getIsSmallBusiness() ? '' : $this->formatMoney($invoice->getTaxCents());
 
-        $footerText = $texts?->getFooterText() ?? '';
+        $footerText = $invoice->getFooterText() ?? $texts?->getFooterText() ?? '';
         $greeting = $invoice->getGreetingText() ?? $texts?->getInvoiceGreeting() ?? '';
         $extraText = $invoice->getExtraText() ?? '';
+        $customFieldBlock = '';
+        $customFieldLabel = trim((string)($invoice->getCustomFieldLabel() ?? ''));
+        $customFieldValue = trim((string)($invoice->getCustomFieldValue() ?? ''));
+        if ($customFieldLabel !== '' && $customFieldValue !== '') {
+            $customFieldBlock = sprintf(
+                '<p><strong>%s:</strong> %s</p>',
+                $this->escape($customFieldLabel),
+                $this->escape($customFieldValue)
+            );
+        }
         $closingText = $texts?->getInvoiceClosingText() ?? '';
         $ownerName = $company?->getOwnerName();
         $closingTextBlock = $closingText
@@ -212,8 +222,8 @@ class InvoicePdfService {
 
         return sprintf(
             '<html><head><meta charset="UTF-8"><style>
-                @page { margin: 32px 32px 110px 32px; }
-                body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #1f2933; margin: 0; padding-bottom: 90px; }
+                @page { margin: 32px 32px 120px 32px; }
+                body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #1f2933; margin: 0; }
                 .company { text-align: right; font-size: 13px; line-height: 1.4; }
                 .customer { margin-top: 18px; font-size: 13px; line-height: 1.4; }
                 h1 { font-size: 20px; margin: 24px 0 8px; }
@@ -221,13 +231,20 @@ class InvoicePdfService {
                 th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 4px; vertical-align: top; }
                 th { text-align: left; background: #f3f4f6; }
                 .totals { margin-top: 12px; text-align: right; }
-                .footer { position: fixed; left: 0; right: 0; bottom: -80px; font-size: 11px; color: #4b5563; text-align: center; }
+                .footer { position: fixed; left: 0; right: 0; bottom: -94px; font-size: 10px; color: #4b5563; border-top: 1px solid #d1d5db; padding-top: 8px; line-height: 1.35; text-align: center; }
+                .footer p { margin: 0 0 4px; }
             </style></head><body>
+            <div class="footer">
+              <p>%s</p>
+              %s
+              %s
+            </div>
             <div class="company">%s</div>
             <div class="customer">%s</div>
             <h1>%s %s</h1>
             <p><strong>Rechnungsnummer:</strong> %s</p>
             <p><strong>Datum:</strong> %s<br><strong>Fällig bis:</strong> %s</p>
+            %s
             %s
             %s
             <p>%s</p>
@@ -251,12 +268,10 @@ class InvoicePdfService {
             </div>
             %s
             %s
-            <div class="footer">
-              <p>%s</p>
-              %s
-              %s
-            </div>
             </body></html>',
+            nl2br($this->escape($footerText)),
+            $bankInfo,
+            '',
             $companyBlock,
             $customerBlock,
             $this->escape($title),
@@ -266,6 +281,7 @@ class InvoicePdfService {
             $dueDate,
             $offerReference,
             $servicePeriod,
+            $customFieldBlock,
             nl2br($this->escape($greeting)),
             nl2br($this->escape($extraText)),
             $rows,
@@ -274,10 +290,7 @@ class InvoicePdfService {
             $taxAmount ? ': ' . $taxAmount : '',
             $this->formatMoney($invoice->getTotalCents()),
             $closingTextBlock,
-            $closingBlock,
-            nl2br($this->escape($footerText)),
-            $bankInfo,
-            ''
+            $closingBlock
         );
     }
 

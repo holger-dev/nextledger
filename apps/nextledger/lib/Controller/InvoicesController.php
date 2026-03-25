@@ -116,6 +116,8 @@ class InvoicesController extends ApiController {
         ?string $greetingText = null,
         ?string $extraText = null,
         ?string $footerText = null,
+        ?string $customFieldLabel = null,
+        ?string $customFieldValue = null,
         ?int $subtotalCents = null,
         ?int $taxCents = null,
         ?int $totalCents = null,
@@ -155,6 +157,8 @@ class InvoicesController extends ApiController {
         $invoice->setGreetingText($greetingText);
         $invoice->setExtraText($extraText);
         $invoice->setFooterText($footerText);
+        $invoice->setCustomFieldLabel($customFieldLabel);
+        $invoice->setCustomFieldValue($customFieldValue);
         $invoice->setSubtotalCents($subtotalCents);
         $invoice->setTaxCents($taxCents);
         $invoice->setTotalCents($totalCents);
@@ -188,6 +192,8 @@ class InvoicesController extends ApiController {
         ?string $greetingText = null,
         ?string $extraText = null,
         ?string $footerText = null,
+        ?string $customFieldLabel = null,
+        ?string $customFieldValue = null,
         ?int $subtotalCents = null,
         ?int $taxCents = null,
         ?int $totalCents = null,
@@ -233,6 +239,8 @@ class InvoicesController extends ApiController {
         $invoice->setGreetingText($greetingText);
         $invoice->setExtraText($extraText);
         $invoice->setFooterText($footerText);
+        $invoice->setCustomFieldLabel($customFieldLabel);
+        $invoice->setCustomFieldValue($customFieldValue);
         $invoice->setSubtotalCents($subtotalCents);
         $invoice->setTaxCents($taxCents);
         $invoice->setTotalCents($totalCents);

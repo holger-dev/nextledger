@@ -177,6 +177,14 @@
         <div class="form-group">
           <NcTextArea :label="t('extraText')" :value.sync="form.extraText" />
         </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <NcTextField :label="t('customFieldLabel')" :value.sync="form.customFieldLabel" />
+          </div>
+          <div class="form-group">
+            <NcTextField :label="t('customFieldValue')" :value.sync="form.customFieldValue" />
+          </div>
+        </div>
         <div class="form-group">
           <NcTextArea :label="t('footerText')" :value.sync="form.footerText" />
         </div>
@@ -539,6 +547,8 @@ export default {
         dueDate: '',
         greetingText: '',
         extraText: '',
+        customFieldLabel: '',
+        customFieldValue: '',
         footerText: '',
         taxRateBp: null,
         taxRatePercent: '19,00',
@@ -791,6 +801,8 @@ export default {
         dueDate: paymentTerms > 0 ? addDaysInput(issueDate, paymentTerms) : '',
         greetingText: this.texts?.invoiceGreeting || '',
         extraText: '',
+        customFieldLabel: '',
+        customFieldValue: '',
         footerText: this.texts?.footerText || '',
         taxRateBp: this.tax?.vatRateBp ?? 0,
         taxRatePercent: percentFromBasisPoints(this.tax?.vatRateBp ?? 0),
@@ -1010,6 +1022,8 @@ export default {
           dueDate: fromDateInput(this.form.dueDate),
           greetingText: this.form.greetingText || null,
           extraText: this.form.extraText || null,
+          customFieldLabel: this.form.customFieldLabel || null,
+          customFieldValue: this.form.customFieldValue || null,
           footerText: this.form.footerText || null,
           subtotalCents,
           taxCents,

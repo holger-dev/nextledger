@@ -11,6 +11,7 @@
 - Restrict company and ledger data to users with explicit access instead of exposing all companies globally
 - Add a recovery dialog after update to assign legacy companies without owner to a Nextcloud user before entering the app
 - Allow inviting additional Nextcloud users to individual companies, including access to company-specific mail settings
+- Add an optional free invoice field (label + value) and render the invoice footer/bank details as a repeated footer on every PDF page
 
 ## 1.5.1
 - Fix auto-stored PDF files in Nextcloud Files so generated invoice/offer PDFs open correctly
