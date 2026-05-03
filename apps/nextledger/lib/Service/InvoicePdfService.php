@@ -23,12 +23,9 @@ use OCA\NextLedger\Db\TaxSettingMapper;
 use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
 use OCA\NextLedger\Service\ActiveCompanyService;
+use OCA\NextLedger\Service\DocumentLocaleService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\IConfig;
-use OCP\IUserSession;
-use DateTimeImmutable;
-use DateTimeZone;
 use RuntimeException;
 
 class InvoicePdfService {
@@ -42,8 +39,7 @@ class InvoicePdfService {
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
         private ActiveCompanyService $activeCompanyService,
-        private IConfig $config,
-        private IUserSession $userSession,
+        private DocumentLocaleService $documentLocaleService,
     ) {}
 
     /**
@@ -63,7 +59,12 @@ class InvoicePdfService {
 
         $html = $this->renderHtml($invoice, $items, $customer, $company, $texts, $tax, $misc, $offer);
         $content = $this->renderPdf($html);
-        $filename = sprintf('rechnung-%s.pdf', $invoice->getNumber() ?: $invoiceId);
+        $languageCode = $this->documentLocaleService->getCompanyLanguage($company);
+        $filename = sprintf(
+            '%s-%s.pdf',
+            $this->sanitizeFilenamePart($this->documentLocaleService->t($languageCode, 'invoice_filename')),
+            $this->sanitizeFilenamePart((string)($invoice->getNumber() ?: $invoiceId))
+        );
 
         return [
             'filename' => $filename,
@@ -101,8 +102,9 @@ class InvoicePdfService {
         ?MiscSetting $misc,
         ?Offer $offer,
     ): string {
-        $issueDate = $this->formatDate($invoice->getIssueDate());
-        $dueDate = $this->formatDate($invoice->getDueDate());
+        $languageCode = $this->documentLocaleService->getCompanyLanguage($company);
+        $issueDate = $this->documentLocaleService->formatDate($invoice->getIssueDate(), $languageCode);
+        $dueDate = $this->documentLocaleService->formatDate($invoice->getDueDate(), $languageCode);
 
         $companyBlock = $company
             ? sprintf(
@@ -135,15 +137,15 @@ class InvoicePdfService {
                 $this->escape($item->getName()),
                 $this->escape($item->getDescription()),
                 $this->escape((string)($item->getQuantity() ?? 0)),
-                $this->formatMoney($item->getUnitPriceCents(), $company?->getCurrencyCode()),
-                $this->formatMoney($item->getTotalCents(), $company?->getCurrencyCode())
+                $this->formatMoney($item->getUnitPriceCents(), $company, $languageCode),
+                $this->formatMoney($item->getTotalCents(), $company, $languageCode)
             );
         }
 
         $taxLine = $invoice->getIsSmallBusiness()
-            ? ($tax?->getSmallBusinessNote() ?: 'Kleinunternehmerregelung')
-            : sprintf('Steuer (%s%%)', number_format(($invoice->getTaxRateBp() ?? 0) / 100, 2, ',', '.'));
-        $taxAmount = $invoice->getIsSmallBusiness() ? '' : $this->formatMoney($invoice->getTaxCents(), $company?->getCurrencyCode());
+            ? ($tax?->getSmallBusinessNote() ?: $this->t($languageCode, 'small_business'))
+            : sprintf('%s (%s%%)', $this->t($languageCode, 'tax'), $this->documentLocaleService->formatPercent(($invoice->getTaxRateBp() ?? 0) / 100, $languageCode));
+        $taxAmount = $invoice->getIsSmallBusiness() ? '' : $this->formatMoney($invoice->getTaxCents(), $company, $languageCode);
 
         $footerText = $invoice->getFooterText() ?? $texts?->getFooterText() ?? '';
         $greeting = $invoice->getGreetingText() ?? $texts?->getInvoiceGreeting() ?? '';
@@ -165,14 +167,15 @@ class InvoicePdfService {
             : '';
         $closingBlock = $ownerName
             ? sprintf(
-                '<p>Mit freundlichen Grüßen</p><p>&nbsp;</p><p>%s</p>',
+                '<p>%s</p><p>&nbsp;</p><p>%s</p>',
+                $this->escape($this->t($languageCode, 'closing_greeting')),
                 $this->escape($ownerName)
             )
-            : '<p>Mit freundlichen Grüßen</p>';
+            : sprintf('<p>%s</p>', $this->escape($this->t($languageCode, 'closing_greeting')));
 
         $bankParts = [];
         if ($misc?->getBankName()) {
-            $bankParts[] = 'Bank: ' . $this->escape($misc->getBankName());
+            $bankParts[] = $this->t($languageCode, 'bank') . ': ' . $this->escape($misc->getBankName());
         }
         if ($misc?->getIban()) {
             $bankParts[] = 'IBAN: ' . $this->escape($misc->getIban());
@@ -181,24 +184,26 @@ class InvoicePdfService {
             $bankParts[] = 'BIC: ' . $this->escape($misc->getBic());
         }
         if ($misc?->getAccountHolder()) {
-            $bankParts[] = 'Kontoinhaber: ' . $this->escape($misc->getAccountHolder());
+            $bankParts[] = $this->t($languageCode, 'account_holder') . ': ' . $this->escape($misc->getAccountHolder());
         }
         $bankInfo = $bankParts ? sprintf('<p>%s</p>', implode(' | ', $bankParts)) : '';
 
         $invoiceType = $this->normalizeInvoiceType($invoice->getInvoiceType());
         $title = match ($invoiceType) {
-            'advance' => 'Abschlagsrechnung',
-            'final' => 'Schlussrechnung',
-            default => 'Rechnung',
+            'advance' => $this->t($languageCode, 'advance_invoice'),
+            'final' => $this->t($languageCode, 'final_invoice'),
+            default => $this->t($languageCode, 'invoice'),
         };
 
         $offerReference = '';
         if ($offer) {
-            $offerDate = $this->formatDate($offer->getIssueDate());
+            $offerDate = $this->documentLocaleService->formatDate($offer->getIssueDate(), $languageCode);
             $offerNumber = $offer->getNumber() ?: (string)$offer->getId();
             $offerReference = sprintf(
-                '<p><strong>Angebot:</strong> %s vom %s</p>',
+                '<p><strong>%s:</strong> %s %s %s</p>',
+                $this->escape($this->t($languageCode, 'offer_reference')),
                 $this->escape($offerNumber),
+                $this->escape($this->t($languageCode, 'from')),
                 $this->escape($offerDate)
             );
         }
@@ -206,16 +211,17 @@ class InvoicePdfService {
         $servicePeriod = '';
         if ($invoiceType === 'advance') {
             $periodStart = $invoice->getServicePeriodStart()
-                ? $this->formatDate($invoice->getServicePeriodStart())
+                ? $this->documentLocaleService->formatDate($invoice->getServicePeriodStart(), $languageCode)
                 : null;
             $periodEnd = $invoice->getServicePeriodEnd()
-                ? $this->formatDate($invoice->getServicePeriodEnd())
+                ? $this->documentLocaleService->formatDate($invoice->getServicePeriodEnd(), $languageCode)
                 : null;
             if ($periodStart || $periodEnd) {
                 $servicePeriod = sprintf(
-                    '<p><strong>Leistungszeitraum:</strong> %s%s</p>',
-                    $periodStart ? $this->escape($periodStart) : '–',
-                    $periodEnd ? ' – ' . $this->escape($periodEnd) : ''
+                    '<p><strong>%s:</strong> %s%s</p>',
+                    $this->escape($this->t($languageCode, 'service_period')),
+                    $periodStart ? $this->escape($periodStart) : $this->escape($this->t($languageCode, 'dash')),
+                    $periodEnd ? ' ' . $this->escape($this->t($languageCode, 'dash')) . ' ' . $this->escape($periodEnd) : ''
                 );
             }
         }
@@ -242,8 +248,8 @@ class InvoicePdfService {
             <div class="company">%s</div>
             <div class="customer">%s</div>
             <h1>%s %s</h1>
-            <p><strong>Rechnungsnummer:</strong> %s</p>
-            <p><strong>Datum:</strong> %s<br><strong>Fällig bis:</strong> %s</p>
+            <p><strong>%s:</strong> %s</p>
+            <p><strong>%s:</strong> %s<br><strong>%s:</strong> %s</p>
             %s
             %s
             %s
@@ -252,19 +258,19 @@ class InvoicePdfService {
             <table>
               <thead>
                 <tr>
-                  <th>Position</th>
-                  <th>Beschreibung</th>
-                  <th style="text-align:right">Menge</th>
-                  <th style="text-align:right">Einzelpreis</th>
-                  <th style="text-align:right">Gesamt</th>
+                  <th>%s</th>
+                  <th>%s</th>
+                  <th style="text-align:right">%s</th>
+                  <th style="text-align:right">%s</th>
+                  <th style="text-align:right">%s</th>
                 </tr>
               </thead>
               <tbody>%s</tbody>
             </table>
             <div class="totals">
-              <p>Zwischensumme: %s</p>
+              <p>%s: %s</p>
               <p>%s%s</p>
-              <p><strong>Gesamt: %s</strong></p>
+              <p><strong>%s: %s</strong></p>
             </div>
             %s
             %s
@@ -276,19 +282,29 @@ class InvoicePdfService {
             $customerBlock,
             $this->escape($title),
             $this->escape($invoice->getNumber() ?? ''),
+            $this->escape($this->t($languageCode, 'invoice_number')),
             $this->escape($invoice->getNumber() ?? ''),
+            $this->escape($this->t($languageCode, 'date')),
             $issueDate,
+            $this->escape($this->t($languageCode, 'due_until')),
             $dueDate,
             $offerReference,
             $servicePeriod,
             $customFieldBlock,
             nl2br($this->escape($greeting)),
             nl2br($this->escape($extraText)),
+            $this->escape($this->t($languageCode, 'position')),
+            $this->escape($this->t($languageCode, 'description')),
+            $this->escape($this->t($languageCode, 'quantity')),
+            $this->escape($this->t($languageCode, 'unit_price')),
+            $this->escape($this->t($languageCode, 'total')),
             $rows,
-            $this->formatMoney($invoice->getSubtotalCents(), $company?->getCurrencyCode()),
+            $this->escape($this->t($languageCode, 'subtotal')),
+            $this->formatMoney($invoice->getSubtotalCents(), $company, $languageCode),
             $this->escape($taxLine),
             $taxAmount ? ': ' . $taxAmount : '',
-            $this->formatMoney($invoice->getTotalCents(), $company?->getCurrencyCode()),
+            $this->escape($this->t($languageCode, 'total')),
+            $this->formatMoney($invoice->getTotalCents(), $company, $languageCode),
             $closingTextBlock,
             $closingBlock
         );
@@ -306,23 +322,17 @@ class InvoicePdfService {
         return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    private function formatMoney(?int $cents, ?string $currencyCode = null): string {
-        if ($cents === null) {
-            return '–';
-        }
-        $currency = strtoupper(trim((string)($currencyCode ?? '')));
-        if ($currency === '') {
-            $currency = 'EUR';
-        }
+    private function t(string $languageCode, string $key): string {
+        return $this->documentLocaleService->t($languageCode, $key);
+    }
 
-        $amount = number_format($cents / 100, 2, ',', '.');
-        return match ($currency) {
-            'EUR' => $amount . ' €',
-            'USD' => '$' . $amount,
-            'GBP' => '£' . $amount,
-            'CHF' => $amount . ' CHF',
-            default => $amount . ' ' . $currency,
-        };
+    private function formatMoney(?int $cents, ?Company $company, string $languageCode): string {
+        return $this->documentLocaleService->formatMoney($cents, $company?->getCurrencyCode(), $languageCode);
+    }
+
+    private function sanitizeFilenamePart(string $value): string {
+        $clean = preg_replace('/[^a-zA-Z0-9._-]+/', '_', trim($value)) ?: 'document';
+        return trim($clean, '._-') ?: 'document';
     }
 
     private function loadCustomer(?int $customerId, int $companyId): ?Customer {
@@ -376,30 +386,4 @@ class InvoicePdfService {
         return $items[0] ?? null;
     }
 
-    private function formatDate(?int $value): string {
-        if (!$value) {
-            return '–';
-        }
-
-        $timezone = $this->getUserTimezone();
-        try {
-            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone($timezone));
-        } catch (\Throwable $e) {
-            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone('UTC'));
-        }
-
-        return $date->format('d.m.Y');
-    }
-
-    private function getUserTimezone(): string {
-        $user = $this->userSession->getUser();
-        if ($user && method_exists($user, 'getUID')) {
-            $timezone = (string)$this->config->getUserValue($user->getUID(), 'core', 'timezone', 'UTC');
-            if ($timezone !== '') {
-                return $timezone;
-            }
-        }
-
-        return 'UTC';
-    }
 }

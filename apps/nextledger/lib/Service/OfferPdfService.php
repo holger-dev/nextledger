@@ -19,12 +19,9 @@ use OCA\NextLedger\Db\TaxSettingMapper;
 use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
 use OCA\NextLedger\Service\ActiveCompanyService;
+use OCA\NextLedger\Service\DocumentLocaleService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
-use OCP\IConfig;
-use OCP\IUserSession;
-use DateTimeImmutable;
-use DateTimeZone;
 use RuntimeException;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -39,8 +36,7 @@ class OfferPdfService {
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
         private ActiveCompanyService $activeCompanyService,
-        private IConfig $config,
-        private IUserSession $userSession,
+        private DocumentLocaleService $documentLocaleService,
     ) {}
 
     /**
@@ -59,7 +55,12 @@ class OfferPdfService {
 
         $html = $this->renderHtml($offer, $items, $customer, $company, $texts, $tax, $misc);
         $content = $this->renderPdf($html);
-        $filename = sprintf('angebot-%s.pdf', $offer->getNumber() ?: $offerId);
+        $languageCode = $this->documentLocaleService->getCompanyLanguage($company);
+        $filename = sprintf(
+            '%s-%s.pdf',
+            $this->sanitizeFilenamePart($this->documentLocaleService->t($languageCode, 'offer_filename')),
+            $this->sanitizeFilenamePart((string)($offer->getNumber() ?: $offerId))
+        );
 
         return [
             'filename' => $filename,
@@ -96,8 +97,9 @@ class OfferPdfService {
         ?TaxSetting $tax,
         ?MiscSetting $misc,
     ): string {
-        $issueDate = $this->formatDate($offer->getIssueDate());
-        $validUntil = $this->formatDate($offer->getValidUntil());
+        $languageCode = $this->documentLocaleService->getCompanyLanguage($company);
+        $issueDate = $this->documentLocaleService->formatDate($offer->getIssueDate(), $languageCode);
+        $validUntil = $this->documentLocaleService->formatDate($offer->getValidUntil(), $languageCode);
 
         $companyBlock = $company
             ? sprintf(
@@ -130,15 +132,15 @@ class OfferPdfService {
                 $this->escape($item->getName()),
                 $this->escape($item->getDescription()),
                 $this->escape((string)($item->getQuantity() ?? 0)),
-                $this->formatMoney($item->getUnitPriceCents(), $company?->getCurrencyCode()),
-                $this->formatMoney($item->getTotalCents(), $company?->getCurrencyCode())
+                $this->formatMoney($item->getUnitPriceCents(), $company, $languageCode),
+                $this->formatMoney($item->getTotalCents(), $company, $languageCode)
             );
         }
 
         $taxLine = $offer->getIsSmallBusiness()
-            ? ($tax?->getSmallBusinessNote() ?: 'Kleinunternehmerregelung')
-            : sprintf('Steuer (%s%%)', number_format(($offer->getTaxRateBp() ?? 0) / 100, 2, ',', '.'));
-        $taxAmount = $offer->getIsSmallBusiness() ? '' : $this->formatMoney($offer->getTaxCents(), $company?->getCurrencyCode());
+            ? ($tax?->getSmallBusinessNote() ?: $this->t($languageCode, 'small_business'))
+            : sprintf('%s (%s%%)', $this->t($languageCode, 'tax'), $this->documentLocaleService->formatPercent(($offer->getTaxRateBp() ?? 0) / 100, $languageCode));
+        $taxAmount = $offer->getIsSmallBusiness() ? '' : $this->formatMoney($offer->getTaxCents(), $company, $languageCode);
 
         $footerText = $texts?->getFooterText() ?? '';
         $greeting = $offer->getGreetingText() ?? $texts?->getOfferGreeting() ?? '';
@@ -150,10 +152,11 @@ class OfferPdfService {
             : '';
         $closingBlock = $ownerName
             ? sprintf(
-                '<p>Mit freundlichen Grüßen</p><p>&nbsp;</p><p>%s</p>',
+                '<p>%s</p><p>&nbsp;</p><p>%s</p>',
+                $this->escape($this->t($languageCode, 'closing_greeting')),
                 $this->escape($ownerName)
             )
-            : '<p>Mit freundlichen Grüßen</p>';
+            : sprintf('<p>%s</p>', $this->escape($this->t($languageCode, 'closing_greeting')));
 
         return sprintf(
             '<html><head><meta charset="UTF-8"><style>
@@ -170,27 +173,27 @@ class OfferPdfService {
             </style></head><body>
             <div class="company">%s</div>
             <div class="customer">%s</div>
-            <h1>Angebot %s</h1>
-            <p><strong>Angebotsnummer:</strong> %s</p>
-            <p><strong>Datum:</strong> %s<br><strong>Gültig bis:</strong> %s</p>
+            <h1>%s %s</h1>
+            <p><strong>%s:</strong> %s</p>
+            <p><strong>%s:</strong> %s<br><strong>%s:</strong> %s</p>
             <p>%s</p>
             <p>%s</p>
             <table>
               <thead>
                 <tr>
-                  <th>Position</th>
-                  <th>Beschreibung</th>
-                  <th style="text-align:right">Menge</th>
-                  <th style="text-align:right">Einzelpreis</th>
-                  <th style="text-align:right">Gesamt</th>
+                  <th>%s</th>
+                  <th>%s</th>
+                  <th style="text-align:right">%s</th>
+                  <th style="text-align:right">%s</th>
+                  <th style="text-align:right">%s</th>
                 </tr>
               </thead>
               <tbody>%s</tbody>
             </table>
             <div class="totals">
-              <p>Zwischensumme: %s</p>
+              <p>%s: %s</p>
               <p>%s%s</p>
-              <p><strong>Gesamt: %s</strong></p>
+              <p><strong>%s: %s</strong></p>
             </div>
             %s
             %s
@@ -201,17 +204,28 @@ class OfferPdfService {
             </body></html>',
             $companyBlock,
             $customerBlock,
+            $this->escape($this->t($languageCode, 'offer')),
             $this->escape($offer->getNumber() ?? ''),
+            $this->escape($this->t($languageCode, 'offer_number')),
             $this->escape($offer->getNumber() ?? ''),
+            $this->escape($this->t($languageCode, 'date')),
             $issueDate,
+            $this->escape($this->t($languageCode, 'valid_until')),
             $validUntil,
             nl2br($this->escape($greeting)),
             nl2br($this->escape($extraText)),
+            $this->escape($this->t($languageCode, 'position')),
+            $this->escape($this->t($languageCode, 'description')),
+            $this->escape($this->t($languageCode, 'quantity')),
+            $this->escape($this->t($languageCode, 'unit_price')),
+            $this->escape($this->t($languageCode, 'total')),
             $rows,
-            $this->formatMoney($offer->getSubtotalCents(), $company?->getCurrencyCode()),
+            $this->escape($this->t($languageCode, 'subtotal')),
+            $this->formatMoney($offer->getSubtotalCents(), $company, $languageCode),
             $this->escape($taxLine),
             $taxAmount ? ': ' . $taxAmount : '',
-            $this->formatMoney($offer->getTotalCents(), $company?->getCurrencyCode()),
+            $this->escape($this->t($languageCode, 'total')),
+            $this->formatMoney($offer->getTotalCents(), $company, $languageCode),
             $closingTextBlock,
             $closingBlock,
             nl2br($this->escape($footerText)),
@@ -223,23 +237,17 @@ class OfferPdfService {
         return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    private function formatMoney(?int $cents, ?string $currencyCode = null): string {
-        if ($cents === null) {
-            return '–';
-        }
-        $currency = strtoupper(trim((string)($currencyCode ?? '')));
-        if ($currency === '') {
-            $currency = 'EUR';
-        }
+    private function t(string $languageCode, string $key): string {
+        return $this->documentLocaleService->t($languageCode, $key);
+    }
 
-        $amount = number_format($cents / 100, 2, ',', '.');
-        return match ($currency) {
-            'EUR' => $amount . ' €',
-            'USD' => '$' . $amount,
-            'GBP' => '£' . $amount,
-            'CHF' => $amount . ' CHF',
-            default => $amount . ' ' . $currency,
-        };
+    private function formatMoney(?int $cents, ?Company $company, string $languageCode): string {
+        return $this->documentLocaleService->formatMoney($cents, $company?->getCurrencyCode(), $languageCode);
+    }
+
+    private function sanitizeFilenamePart(string $value): string {
+        $clean = preg_replace('/[^a-zA-Z0-9._-]+/', '_', trim($value)) ?: 'document';
+        return trim($clean, '._-') ?: 'document';
     }
 
     private function loadCustomer(?int $customerId, int $companyId): ?Customer {
@@ -280,30 +288,4 @@ class OfferPdfService {
         return $items[0] ?? null;
     }
 
-    private function formatDate(?int $value): string {
-        if (!$value) {
-            return '–';
-        }
-
-        $timezone = $this->getUserTimezone();
-        try {
-            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone($timezone));
-        } catch (\Throwable $e) {
-            $date = (new DateTimeImmutable('@' . $value))->setTimezone(new DateTimeZone('UTC'));
-        }
-
-        return $date->format('d.m.Y');
-    }
-
-    private function getUserTimezone(): string {
-        $user = $this->userSession->getUser();
-        if ($user && method_exists($user, 'getUID')) {
-            $timezone = (string)$this->config->getUserValue($user->getUID(), 'core', 'timezone', 'UTC');
-            if ($timezone !== '') {
-                return $timezone;
-            }
-        }
-
-        return 'UTC';
-    }
 }

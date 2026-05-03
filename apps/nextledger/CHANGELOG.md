@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.6.1
+- Add a per-company document language setting, defaulting to the Nextcloud language.
+- Render invoice and offer PDF labels, dates, amounts, and totals in the company's selected document language.
+- Localize generated invoice and offer PDF filenames according to the company's document language.
+- Add NGN and ten additional major currencies to company settings, including PDF formatting support.
+
 ## 1.6.0
 - Add optional holding/group assignment for companies so related companies can be managed together in company settings
 - Show the holding/group directly in the company overview; this is an organizational grouping only, no consolidated balance sheet is introduced

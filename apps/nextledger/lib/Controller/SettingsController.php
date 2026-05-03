@@ -16,6 +16,7 @@ use OCA\NextLedger\Db\TaxSettingMapper;
 use OCA\NextLedger\Db\Texts;
 use OCA\NextLedger\Db\TextsMapper;
 use OCA\NextLedger\Service\ActiveCompanyService;
+use OCA\NextLedger\Service\DocumentLocaleService;
 use OCA\NextLedger\Service\EmailSettingsService;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Http;
@@ -33,6 +34,7 @@ class SettingsController extends ApiController {
         private MiscSettingMapper $miscSettingMapper,
         private DocumentSettingMapper $documentSettingMapper,
         private ActiveCompanyService $activeCompanyService,
+        private DocumentLocaleService $documentLocaleService,
         private EmailSettingsService $emailSettingsService,
         private IUserManager $userManager,
     ) {
@@ -127,11 +129,13 @@ class SettingsController extends ApiController {
         ?string $phone = null,
         ?string $vatId = null,
         ?string $taxId = null,
+        ?string $languageCode = null,
     ): JSONResponse {
         $company = new Company();
         $company->setName($name ?: 'Neue Firma');
         $company->setGroupName($groupName);
         $company->setCurrencyCode($this->normalizeCurrencyCode($currencyCode));
+        $company->setLanguageCode($this->normalizeLanguageCode($languageCode));
         $company->setOwnerUserId($this->emailSettingsService->getCurrentUserId());
         $company->setOwnerName($ownerName);
         $company->setStreet($street);
@@ -235,11 +239,13 @@ class SettingsController extends ApiController {
         ?string $phone = null,
         ?string $vatId = null,
         ?string $taxId = null,
+        ?string $languageCode = null,
     ): JSONResponse {
         $company = $this->activeCompanyService->getActiveCompany();
         $company->setName($name);
         $company->setGroupName($groupName);
         $company->setCurrencyCode($this->normalizeCurrencyCode($currencyCode));
+        $company->setLanguageCode($this->normalizeLanguageCode($languageCode));
         $company->setOwnerName($ownerName);
         $company->setStreet($street);
         $company->setHouseNumber($houseNumber);
@@ -507,6 +513,7 @@ class SettingsController extends ApiController {
         $data = $this->entityToArray($company);
         $companyId = (int)($company->getId() ?? 0);
         $data['currencyCode'] = $this->normalizeCurrencyCode($data['currencyCode'] ?? null);
+        $data['languageCode'] = $this->normalizeLanguageCode($data['languageCode'] ?? null);
         $data['sharedUserIds'] = $companyId > 0 ? $this->activeCompanyService->getSharedUserIds($companyId) : [];
         $data['canManageUsers'] = $companyId > 0 ? $this->activeCompanyService->canManageCompanyUsers($companyId) : false;
         $data['isOwner'] = $data['canManageUsers'];
@@ -536,5 +543,9 @@ class SettingsController extends ApiController {
     private function normalizeCurrencyCode(?string $value): string {
         $normalized = strtoupper(trim((string)($value ?? '')));
         return $normalized !== '' ? $normalized : 'EUR';
+    }
+
+    private function normalizeLanguageCode(?string $value): string {
+        return $this->documentLocaleService->normalizeLanguageCode($value);
     }
 }

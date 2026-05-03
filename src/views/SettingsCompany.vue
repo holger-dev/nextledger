@@ -81,6 +81,17 @@
         @input="form.currencyCode = $event"
       />
       <p class="hint">{{ t('currencyCodeHint') }}</p>
+      <NcSelect
+        :value="form.languageCode"
+        :options="languageOptions"
+        :reduce="(option) => option.value"
+        :append-to-body="false"
+        :clearable="false"
+        :input-label="t('languageCode')"
+        :label-outside="true"
+        @input="form.languageCode = $event"
+      />
+      <p class="hint">{{ t('languageCodeHint') }}</p>
       <div v-if="canManageUsers" class="share-box">
         <NcSelect
           :value="selectedSharedUserId"
@@ -173,6 +184,7 @@ export default {
         vatId: '',
         taxId: '',
         currencyCode: 'EUR',
+        languageCode: 'de',
       },
     }
   },
@@ -184,8 +196,25 @@ export default {
       return [
         { value: 'EUR', label: 'Euro (EUR)' },
         { value: 'USD', label: 'US-Dollar (USD)' },
-        { value: 'CHF', label: 'Schweizer Franken (CHF)' },
         { value: 'GBP', label: 'Pfund Sterling (GBP)' },
+        { value: 'CHF', label: 'Schweizer Franken (CHF)' },
+        { value: 'NGN', label: 'Nigerianischer Naira (NGN)' },
+        { value: 'JPY', label: 'Japanischer Yen (JPY)' },
+        { value: 'CNY', label: 'Chinesischer Yuan (CNY)' },
+        { value: 'INR', label: 'Indische Rupie (INR)' },
+        { value: 'CAD', label: 'Kanadischer Dollar (CAD)' },
+        { value: 'AUD', label: 'Australischer Dollar (AUD)' },
+        { value: 'BRL', label: 'Brasilianischer Real (BRL)' },
+        { value: 'MXN', label: 'Mexikanischer Peso (MXN)' },
+        { value: 'ZAR', label: 'Südafrikanischer Rand (ZAR)' },
+        { value: 'SEK', label: 'Schwedische Krone (SEK)' },
+        { value: 'NOK', label: 'Norwegische Krone (NOK)' },
+      ]
+    },
+    languageOptions() {
+      return [
+        { value: 'de', label: this.t('languageGerman') },
+        { value: 'en', label: this.t('languageEnglish') },
       ]
     },
     sharedUserOptions() {
@@ -226,6 +255,7 @@ export default {
         vatId: safeString(data.vatId),
         taxId: safeString(data.taxId),
         currencyCode: safeString(data.currencyCode || 'EUR'),
+        languageCode: safeString(data.languageCode || 'de'),
       }
       this.canManageUsers = Boolean(data.canManageUsers)
       this.availableUsers = Array.isArray(data.availableUsers) ? data.availableUsers : []

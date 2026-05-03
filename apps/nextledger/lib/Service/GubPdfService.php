@@ -233,6 +233,17 @@ class GubPdfService {
             'USD' => '$' . $amount,
             'GBP' => '£' . $amount,
             'CHF' => $amount . ' CHF',
+            'NGN' => '₦' . $amount,
+            'JPY' => '¥' . $amount,
+            'CNY' => '¥' . $amount,
+            'INR' => '₹' . $amount,
+            'CAD' => 'CA$' . $amount,
+            'AUD' => 'A$' . $amount,
+            'NZD' => 'NZ$' . $amount,
+            'BRL' => 'R$' . $amount,
+            'MXN' => 'MX$' . $amount,
+            'ZAR' => $amount . ' R',
+            'SEK', 'NOK', 'DKK' => $amount . ' ' . $currency,
             default => $amount . ' ' . $currency,
         };
     }

@@ -21,6 +21,7 @@ class Company extends Entity {
     public $vatId;
     public $taxId;
     public $currencyCode;
+    public $languageCode;
 
     public function __construct() {
         $this->addType('name', 'string');
@@ -36,5 +37,6 @@ class Company extends Entity {
         $this->addType('vatId', 'string');
         $this->addType('taxId', 'string');
         $this->addType('currencyCode', 'string');
+        $this->addType('languageCode', 'string');
     }
 }
