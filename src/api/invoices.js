@@ -29,5 +29,8 @@ export const deleteInvoice = (id) =>
 export const getInvoicePdfUrl = (id) =>
   generateUrl(`${base}/${id}/pdf`)
 
+export const getInvoiceZugferdXmlUrl = (id) =>
+  generateUrl(`${base}/${id}/zugferd-xml`)
+
 export const sendInvoiceEmail = (id, payload) =>
   axios.post(generateUrl(`${base}/${id}/send-email`), payload).then((r) => r.data)

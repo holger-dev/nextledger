@@ -92,6 +92,72 @@
         @input="form.languageCode = $event"
       />
       <p class="hint">{{ t('languageCodeHint') }}</p>
+
+      <NcTextField :label="t('countryCode')" :value.sync="form.countryCode" />
+      <p class="hint">{{ t('countryCodeHint') }}</p>
+
+      <h2>{{ t('logoSection') }}</h2>
+      <div class="logo-block">
+        <div v-if="hasLogo" class="logo-preview">
+          <img :src="logoDataUri" alt="logo" />
+        </div>
+        <p v-else class="hint">{{ t('logoNone') }}</p>
+
+        <div class="logo-actions">
+          <input
+            ref="logoInput"
+            type="file"
+            accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
+            class="logo-input"
+            @change="onLogoFileChange"
+          />
+          <NcButton type="secondary" :disabled="uploadingLogo" @click="$refs.logoInput.click()">
+            {{ hasLogo ? t('logoReplace') : t('logoUpload') }}
+          </NcButton>
+          <NcButton v-if="hasLogo" type="tertiary" :disabled="uploadingLogo" @click="removeLogo">
+            {{ t('logoRemove') }}
+          </NcButton>
+        </div>
+        <p class="hint">{{ t('logoHint') }}</p>
+        <span v-if="logoStatus" class="success">{{ logoStatus }}</span>
+
+        <NcSelect
+          :value="form.logoSize"
+          :options="logoSizeOptions"
+          :reduce="(option) => option.value"
+          :append-to-body="false"
+          :clearable="false"
+          :input-label="t('logoSize')"
+          :label-outside="true"
+          @input="form.logoSize = $event"
+        />
+      </div>
+
+      <h2>{{ t('invoiceFormatSection') }}</h2>
+      <NcSelect
+        :value="form.invoiceFormat"
+        :options="invoiceFormatOptions"
+        :reduce="(option) => option.value"
+        :append-to-body="false"
+        :clearable="false"
+        :input-label="t('invoiceFormat')"
+        :label-outside="true"
+        @input="form.invoiceFormat = $event"
+      />
+      <p class="hint">{{ t('invoiceFormatHint') }}</p>
+
+      <NcSelect
+        :value="form.mailAttachment"
+        :options="mailAttachmentOptions"
+        :reduce="(option) => option.value"
+        :append-to-body="false"
+        :clearable="false"
+        :input-label="t('mailAttachment')"
+        :label-outside="true"
+        @input="form.mailAttachment = $event"
+      />
+      <p class="hint">{{ t('mailAttachmentHint') }}</p>
+
       <div v-if="canManageUsers" class="share-box">
         <NcSelect
           :value="selectedSharedUserId"
@@ -143,9 +209,12 @@ import {
   activateCompany,
   createCompany,
   deleteCompany,
+  deleteCompanyLogo,
   getCompanies,
   getCompany,
+  getCompanyLogo,
   saveCompany,
+  uploadCompanyLogo,
 } from '../api/settings'
 
 export default {
@@ -171,6 +240,10 @@ export default {
       newCompanyName: '',
       sharedUserIds: [],
       selectedSharedUserId: '',
+      hasLogo: false,
+      logoDataUri: '',
+      uploadingLogo: false,
+      logoStatus: '',
       form: {
         name: '',
         groupName: '',
@@ -185,6 +258,10 @@ export default {
         taxId: '',
         currencyCode: 'EUR',
         languageCode: 'de',
+        countryCode: 'DE',
+        invoiceFormat: 'pdf',
+        logoSize: 'medium',
+        mailAttachment: 'pdf',
       },
     }
   },
@@ -215,6 +292,26 @@ export default {
       return [
         { value: 'de', label: this.t('languageGerman') },
         { value: 'en', label: this.t('languageEnglish') },
+      ]
+    },
+    logoSizeOptions() {
+      return [
+        { value: 'small', label: this.t('logoSizeSmall') },
+        { value: 'medium', label: this.t('logoSizeMedium') },
+        { value: 'large', label: this.t('logoSizeLarge') },
+      ]
+    },
+    invoiceFormatOptions() {
+      return [
+        { value: 'pdf', label: this.t('invoiceFormatPdf') },
+        { value: 'zugferd', label: this.t('invoiceFormatZugferd') },
+      ]
+    },
+    mailAttachmentOptions() {
+      return [
+        { value: 'pdf', label: this.t('mailAttachmentPdf') },
+        { value: 'xml', label: this.t('mailAttachmentXml') },
+        { value: 'both', label: this.t('mailAttachmentBoth') },
       ]
     },
     sharedUserOptions() {
@@ -256,11 +353,16 @@ export default {
         taxId: safeString(data.taxId),
         currencyCode: safeString(data.currencyCode || 'EUR'),
         languageCode: safeString(data.languageCode || 'de'),
+        countryCode: safeString(data.countryCode || 'DE').toUpperCase(),
+        invoiceFormat: safeString(data.invoiceFormat || 'pdf'),
+        logoSize: safeString(data.logoSize || 'medium'),
+        mailAttachment: safeString(data.mailAttachment || 'pdf'),
       }
       this.canManageUsers = Boolean(data.canManageUsers)
       this.availableUsers = Array.isArray(data.availableUsers) ? data.availableUsers : []
       this.sharedUserIds = Array.isArray(data.sharedUserIds) ? data.sharedUserIds : []
       this.selectedSharedUserId = ''
+      this.hasLogo = Boolean(data.hasLogo)
     },
     async load() {
       this.loading = true
@@ -282,6 +384,57 @@ export default {
     async loadActiveCompany() {
       const data = await getCompany()
       this.applyCompanyData(data)
+      await this.loadLogo()
+    },
+    async loadLogo() {
+      try {
+        const logo = await getCompanyLogo()
+        this.hasLogo = Boolean(logo?.hasLogo)
+        this.logoDataUri = this.hasLogo ? String(logo.dataUri || '') : ''
+      } catch (e) {
+        this.hasLogo = false
+        this.logoDataUri = ''
+      }
+    },
+    async onLogoFileChange(event) {
+      const file = event?.target?.files?.[0]
+      if (!file) {
+        return
+      }
+      this.uploadingLogo = true
+      this.logoStatus = ''
+      this.error = ''
+      try {
+        const data = await uploadCompanyLogo(file, this.form.logoSize)
+        this.applyCompanyData(data)
+        await this.loadLogo()
+        this.logoStatus = this.t('logoUploaded')
+        window.setTimeout(() => { this.logoStatus = '' }, 2500)
+      } catch (e) {
+        this.error = this.t('logoUploadError')
+      } finally {
+        this.uploadingLogo = false
+        if (this.$refs.logoInput) {
+          this.$refs.logoInput.value = ''
+        }
+      }
+    },
+    async removeLogo() {
+      this.uploadingLogo = true
+      this.logoStatus = ''
+      this.error = ''
+      try {
+        const data = await deleteCompanyLogo()
+        this.applyCompanyData(data)
+        this.hasLogo = false
+        this.logoDataUri = ''
+        this.logoStatus = this.t('logoDeleted')
+        window.setTimeout(() => { this.logoStatus = '' }, 2500)
+      } catch (e) {
+        this.error = this.t('logoUploadError')
+      } finally {
+        this.uploadingLogo = false
+      }
     },
     isActiveCompany(id) {
       return Number(this.activeCompanyId) === Number(id)
@@ -403,6 +556,41 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.logo-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 8px;
+  background: var(--color-background-dark, #f7f9fb);
+}
+
+.logo-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: var(--color-main-background, #fff);
+  border: 1px dashed var(--color-border, #d1d5db);
+  border-radius: 6px;
+}
+
+.logo-preview img {
+  max-height: 110px;
+  max-width: 100%;
+}
+
+.logo-input {
+  display: none;
+}
+
+.logo-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .shared-users-list {

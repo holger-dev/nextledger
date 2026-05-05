@@ -106,6 +106,12 @@
           <p v-if="fieldErrors.billingEmail" class="field-error">{{ fieldErrors.billingEmail }}</p>
         </div>
         <div class="form-group">
+          <NcTextField :label="t('countryCode')" :value.sync="form.countryCode" />
+        </div>
+        <div class="form-group">
+          <NcTextField :label="t('vatId')" :value.sync="form.vatId" />
+        </div>
+        <div class="form-group">
           <p class="label">{{ t('invoiceRecipientLabel') }}</p>
           <div class="recipient-switches">
             <NcCheckboxRadioSwitch
@@ -185,6 +191,8 @@ export default {
         billingEmail: '',
         sendInvoiceToBillingEmail: false,
         sendInvoiceToContactEmail: false,
+        countryCode: 'DE',
+        vatId: '',
       },
       recipientsTouched: false,
       originalRecipientFlags: {
@@ -280,6 +288,8 @@ export default {
         billingEmail: '',
         sendInvoiceToBillingEmail: false,
         sendInvoiceToContactEmail: false,
+        countryCode: 'DE',
+        vatId: '',
       }
       this.recipientsTouched = false
       this.originalRecipientFlags = {
@@ -310,6 +320,8 @@ export default {
         billingEmail: item.billingEmail || '',
         sendInvoiceToBillingEmail: !!item.sendInvoiceToBillingEmail,
         sendInvoiceToContactEmail: !!item.sendInvoiceToContactEmail,
+        countryCode: (item.countryCode || 'DE').toUpperCase(),
+        vatId: item.vatId || '',
       }
       this.originalRecipientFlags = {
         sendInvoiceToBillingEmail:
@@ -356,6 +368,8 @@ export default {
         city: this.form.city.trim(),
         email: this.form.email.trim(),
         billingEmail: this.form.billingEmail.trim(),
+        countryCode: (this.form.countryCode || 'DE').trim().toUpperCase(),
+        vatId: (this.form.vatId || '').trim(),
         sendInvoiceToBillingEmail: this.recipientsTouched
           ? !!this.form.sendInvoiceToBillingEmail
           : this.originalRecipientFlags.sendInvoiceToBillingEmail,

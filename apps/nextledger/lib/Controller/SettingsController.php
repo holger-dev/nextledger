@@ -130,6 +130,10 @@ class SettingsController extends ApiController {
         ?string $vatId = null,
         ?string $taxId = null,
         ?string $languageCode = null,
+        ?string $countryCode = null,
+        ?string $invoiceFormat = null,
+        ?string $logoSize = null,
+        ?string $mailAttachment = null,
     ): JSONResponse {
         $company = new Company();
         $company->setName($name ?: 'Neue Firma');
@@ -146,6 +150,10 @@ class SettingsController extends ApiController {
         $company->setPhone($phone);
         $company->setVatId($vatId);
         $company->setTaxId($taxId);
+        $company->setCountryCode($this->normalizeCountryCode($countryCode));
+        $company->setInvoiceFormat($this->normalizeInvoiceFormat($invoiceFormat));
+        $company->setLogoSize($this->normalizeLogoSize($logoSize));
+        $company->setMailAttachment($this->normalizeMailAttachment($mailAttachment));
 
         /** @var Company $saved */
         $saved = $this->companyMapper->insert($company);
@@ -240,6 +248,10 @@ class SettingsController extends ApiController {
         ?string $vatId = null,
         ?string $taxId = null,
         ?string $languageCode = null,
+        ?string $countryCode = null,
+        ?string $invoiceFormat = null,
+        ?string $logoSize = null,
+        ?string $mailAttachment = null,
     ): JSONResponse {
         $company = $this->activeCompanyService->getActiveCompany();
         $company->setName($name);
@@ -255,11 +267,96 @@ class SettingsController extends ApiController {
         $company->setPhone($phone);
         $company->setVatId($vatId);
         $company->setTaxId($taxId);
+        $company->setCountryCode($this->normalizeCountryCode($countryCode));
+        $company->setInvoiceFormat($this->normalizeInvoiceFormat($invoiceFormat));
+        $company->setLogoSize($this->normalizeLogoSize($logoSize));
+        $company->setMailAttachment($this->normalizeMailAttachment($mailAttachment));
         /** @var Company $saved */
         $saved = $this->companyMapper->update($company);
         if (is_array($sharedUserIds)) {
             $this->activeCompanyService->saveSharedUserIds((int)$saved->getId(), $sharedUserIds);
         }
+
+        return new JSONResponse($this->entityToCompanyArray($saved));
+    }
+
+    /**
+     * Upload (or update) the active company's logo.
+     *
+     * Expects multipart "file" or JSON {"data": "data:image/...;base64,...."}.
+     *
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function uploadCompanyLogo(): JSONResponse {
+        $company = $this->activeCompanyService->getActiveCompany();
+        if (!$this->activeCompanyService->canManageCompanyUsers((int)$company->getId())) {
+            return new JSONResponse(['message' => 'Keine Berechtigung.'], Http::STATUS_FORBIDDEN);
+        }
+
+        $params = $this->request->getParams();
+        $mime = null;
+        $base64 = null;
+
+        $upload = $this->request->getUploadedFile('file');
+        if (is_array($upload) && (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && !empty($upload['tmp_name'])) {
+            $size = (int)($upload['size'] ?? 0);
+            if ($size > 1_500_000) {
+                return new JSONResponse(['message' => 'Logo ist zu groß (max. 1,5 MB).'], Http::STATUS_BAD_REQUEST);
+            }
+            $bytes = @file_get_contents($upload['tmp_name']);
+            if ($bytes === false) {
+                return new JSONResponse(['message' => 'Logo konnte nicht gelesen werden.'], Http::STATUS_BAD_REQUEST);
+            }
+            $mime = $this->detectImageMime($bytes, (string)($upload['type'] ?? ''));
+            $base64 = base64_encode($bytes);
+        } else {
+            $dataUri = (string)($params['data'] ?? '');
+            if ($dataUri !== '' && preg_match('#^data:(image/(?:png|jpeg|jpg|svg\+xml|gif|webp));base64,(.+)$#', $dataUri, $m)) {
+                $mime = strtolower($m[1]);
+                $bytes = base64_decode($m[2], true);
+                if ($bytes === false) {
+                    return new JSONResponse(['message' => 'Ungültige Bilddaten.'], Http::STATUS_BAD_REQUEST);
+                }
+                if (strlen($bytes) > 1_500_000) {
+                    return new JSONResponse(['message' => 'Logo ist zu groß (max. 1,5 MB).'], Http::STATUS_BAD_REQUEST);
+                }
+                $base64 = $m[2];
+            }
+        }
+
+        if ($mime === null || $base64 === null) {
+            return new JSONResponse(['message' => 'Keine Bilddatei erhalten.'], Http::STATUS_BAD_REQUEST);
+        }
+        if (!in_array($mime, ['image/png', 'image/jpeg', 'image/svg+xml', 'image/gif', 'image/webp'], true)) {
+            return new JSONResponse(['message' => 'Nur PNG, JPEG, SVG, GIF oder WebP zulässig.'], Http::STATUS_BAD_REQUEST);
+        }
+
+        $size = $this->normalizeLogoSize((string)($params['logoSize'] ?? $company->getLogoSize() ?? 'medium'));
+
+        $company->setLogoData($base64);
+        $company->setLogoMime($mime);
+        $company->setLogoSize($size);
+        /** @var Company $saved */
+        $saved = $this->companyMapper->update($company);
+
+        return new JSONResponse($this->entityToCompanyArray($saved));
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function deleteCompanyLogo(): JSONResponse {
+        $company = $this->activeCompanyService->getActiveCompany();
+        if (!$this->activeCompanyService->canManageCompanyUsers((int)$company->getId())) {
+            return new JSONResponse(['message' => 'Keine Berechtigung.'], Http::STATUS_FORBIDDEN);
+        }
+
+        $company->setLogoData(null);
+        $company->setLogoMime(null);
+        /** @var Company $saved */
+        $saved = $this->companyMapper->update($company);
 
         return new JSONResponse($this->entityToCompanyArray($saved));
     }
@@ -514,12 +611,88 @@ class SettingsController extends ApiController {
         $companyId = (int)($company->getId() ?? 0);
         $data['currencyCode'] = $this->normalizeCurrencyCode($data['currencyCode'] ?? null);
         $data['languageCode'] = $this->normalizeLanguageCode($data['languageCode'] ?? null);
+        $data['countryCode'] = $this->normalizeCountryCode($data['countryCode'] ?? null);
+        $data['invoiceFormat'] = $this->normalizeInvoiceFormat($data['invoiceFormat'] ?? null);
+        $data['logoSize'] = $this->normalizeLogoSize($data['logoSize'] ?? null);
+        $data['mailAttachment'] = $this->normalizeMailAttachment($data['mailAttachment'] ?? null);
+        $hasLogo = !empty($data['logoData']) && !empty($data['logoMime']);
+        $data['hasLogo'] = $hasLogo;
+        $data['logoMime'] = $hasLogo ? $data['logoMime'] : null;
+        // Don't ship raw base64 in list payloads — frontend pulls it via /company/logo
+        unset($data['logoData']);
         $data['sharedUserIds'] = $companyId > 0 ? $this->activeCompanyService->getSharedUserIds($companyId) : [];
         $data['canManageUsers'] = $companyId > 0 ? $this->activeCompanyService->canManageCompanyUsers($companyId) : false;
         $data['isOwner'] = $data['canManageUsers'];
         $data['availableUsers'] = $this->listAvailableUsers();
 
         return $data;
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function getCompanyLogo(): JSONResponse {
+        try {
+            $company = $this->activeCompanyService->getActiveCompany();
+        } catch (\InvalidArgumentException $e) {
+            return new JSONResponse(['hasLogo' => false]);
+        }
+        $data = $company->getLogoData();
+        $mime = $company->getLogoMime();
+        if (!$data || !$mime) {
+            return new JSONResponse(['hasLogo' => false]);
+        }
+        return new JSONResponse([
+            'hasLogo' => true,
+            'mime' => $mime,
+            'size' => $this->normalizeLogoSize($company->getLogoSize()),
+            'dataUri' => sprintf('data:%s;base64,%s', $mime, $data),
+        ]);
+    }
+
+    private function detectImageMime(string $bytes, string $hintedType): string {
+        $hinted = strtolower(trim($hintedType));
+        if ($hinted !== '' && str_starts_with($hinted, 'image/')) {
+            return $hinted === 'image/jpg' ? 'image/jpeg' : $hinted;
+        }
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo !== false) {
+                $detected = finfo_buffer($finfo, $bytes) ?: '';
+                finfo_close($finfo);
+                if (str_starts_with($detected, 'image/')) {
+                    return $detected;
+                }
+            }
+        }
+        return 'image/png';
+    }
+
+    private function normalizeLogoSize(?string $value): string {
+        $allowed = ['small', 'medium', 'large'];
+        $normalized = strtolower(trim((string)($value ?? '')));
+        return in_array($normalized, $allowed, true) ? $normalized : 'medium';
+    }
+
+    private function normalizeInvoiceFormat(?string $value): string {
+        $allowed = ['pdf', 'zugferd'];
+        $normalized = strtolower(trim((string)($value ?? '')));
+        return in_array($normalized, $allowed, true) ? $normalized : 'pdf';
+    }
+
+    private function normalizeMailAttachment(?string $value): string {
+        $allowed = ['pdf', 'xml', 'both'];
+        $normalized = strtolower(trim((string)($value ?? '')));
+        return in_array($normalized, $allowed, true) ? $normalized : 'pdf';
+    }
+
+    private function normalizeCountryCode(?string $value): string {
+        $normalized = strtoupper(trim((string)($value ?? '')));
+        if (preg_match('/^[A-Z]{2}$/', $normalized)) {
+            return $normalized;
+        }
+        return 'DE';
     }
 
     private function listAvailableUsers(): array {

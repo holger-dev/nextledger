@@ -22,6 +22,12 @@ class Company extends Entity {
     public $taxId;
     public $currencyCode;
     public $languageCode;
+    public $logoData;
+    public $logoMime;
+    public $logoSize;
+    public $invoiceFormat;
+    public $countryCode;
+    public $mailAttachment;
 
     public function __construct() {
         $this->addType('name', 'string');
@@ -38,5 +44,11 @@ class Company extends Entity {
         $this->addType('taxId', 'string');
         $this->addType('currencyCode', 'string');
         $this->addType('languageCode', 'string');
+        $this->addType('logoData', 'string');
+        $this->addType('logoMime', 'string');
+        $this->addType('logoSize', 'string');
+        $this->addType('invoiceFormat', 'string');
+        $this->addType('countryCode', 'string');
+        $this->addType('mailAttachment', 'string');
     }
 }

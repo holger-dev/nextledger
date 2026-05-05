@@ -53,6 +53,8 @@ class CustomersController extends ApiController {
         ?string $billingEmail = null,
         ?bool $sendInvoiceToBillingEmail = null,
         ?bool $sendInvoiceToContactEmail = null,
+        ?string $countryCode = null,
+        ?string $vatId = null,
     ): JSONResponse {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $customer = new Customer();
@@ -67,6 +69,8 @@ class CustomersController extends ApiController {
         $customer->setBillingEmail($billingEmail);
         $customer->setSendInvoiceToBillingEmail($sendInvoiceToBillingEmail);
         $customer->setSendInvoiceToContactEmail($sendInvoiceToContactEmail);
+        $customer->setCountryCode($this->normalizeCountryCode($countryCode));
+        $customer->setVatId($vatId);
         $customer->setCreatedAt(time());
         $customer->setUpdatedAt(time());
 
@@ -90,6 +94,8 @@ class CustomersController extends ApiController {
         ?string $billingEmail = null,
         ?bool $sendInvoiceToBillingEmail = null,
         ?bool $sendInvoiceToContactEmail = null,
+        ?string $countryCode = null,
+        ?string $vatId = null,
     ): JSONResponse {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $customerId = (int)$id;
@@ -111,10 +117,20 @@ class CustomersController extends ApiController {
         $customer->setBillingEmail($billingEmail);
         $customer->setSendInvoiceToBillingEmail($sendInvoiceToBillingEmail);
         $customer->setSendInvoiceToContactEmail($sendInvoiceToContactEmail);
+        $customer->setCountryCode($this->normalizeCountryCode($countryCode));
+        $customer->setVatId($vatId);
         $customer->setUpdatedAt(time());
 
         $saved = $this->customerMapper->update($customer);
         return new JSONResponse($this->entityToArray($saved));
+    }
+
+    private function normalizeCountryCode(?string $value): string {
+        $normalized = strtoupper(trim((string)($value ?? '')));
+        if (preg_match('/^[A-Z]{2}$/', $normalized)) {
+            return $normalized;
+        }
+        return 'DE';
     }
 
     /**

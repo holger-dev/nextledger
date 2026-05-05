@@ -75,7 +75,9 @@ class OfferPdfService {
 
         $options = new Options();
         $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
         $options->set('defaultFont', 'Helvetica');
+        $options->set('chroot', [sys_get_temp_dir(), realpath(getcwd())]);
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
@@ -112,6 +114,9 @@ class OfferPdfService {
                 $this->escape($company->getEmail())
             )
             : '';
+
+        [$logoSize, $logoBlock, $logoCss] = $this->buildLogoBlock($company);
+        $companyHeader = $this->buildCompanyHeader($logoSize, $logoBlock, $companyBlock);
 
         $customerBlock = $customer
             ? sprintf(
@@ -162,23 +167,30 @@ class OfferPdfService {
             '<html><head><meta charset="UTF-8"><style>
                 @page { margin: 32px 32px 110px 32px; }
                 body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #1f2933; margin: 0; padding-bottom: 90px; }
+                .header { width: 100%%; border-collapse: collapse; }
+                .header td { vertical-align: top; padding: 0; }
                 .company { text-align: right; font-size: 13px; line-height: 1.4; }
                 .customer { margin-top: 18px; font-size: 13px; line-height: 1.4; }
                 h1 { font-size: 20px; margin: 24px 0 8px; }
-                table { width: 100%%; border-collapse: collapse; margin-top: 12px; }
-                th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 4px; vertical-align: top; }
-                th { text-align: left; background: #f3f4f6; }
+                .logo-small { max-height: 32px; max-width: 220px; }
+                .logo-medium { max-height: 64px; max-width: 260px; }
+                .logo-large { max-height: 110px; max-width: 100%%; display: block; }
+                .logo-banner { width: 100%%; text-align: left; margin-bottom: 14px; }
+                %s
+                table.items { width: 100%%; border-collapse: collapse; margin-top: 12px; }
+                table.items th, table.items td { border-bottom: 1px solid #e5e7eb; padding: 8px 4px; vertical-align: top; }
+                table.items th { text-align: left; background: #f3f4f6; }
                 .totals { margin-top: 12px; text-align: right; }
                 .footer { position: fixed; left: 0; right: 0; bottom: -80px; font-size: 11px; color: #4b5563; }
             </style></head><body>
-            <div class="company">%s</div>
+            %s
             <div class="customer">%s</div>
             <h1>%s %s</h1>
             <p><strong>%s:</strong> %s</p>
             <p><strong>%s:</strong> %s<br><strong>%s:</strong> %s</p>
             <p>%s</p>
             <p>%s</p>
-            <table>
+            <table class="items">
               <thead>
                 <tr>
                   <th>%s</th>
@@ -202,7 +214,8 @@ class OfferPdfService {
               %s
             </div>
             </body></html>',
-            $companyBlock,
+            $logoCss,
+            $companyHeader,
             $customerBlock,
             $this->escape($this->t($languageCode, 'offer')),
             $this->escape($offer->getNumber() ?? ''),
@@ -286,6 +299,91 @@ class OfferPdfService {
     private function loadMisc(int $companyId): ?MiscSetting {
         $items = $this->miscSettingMapper->findAllByCompanyId($companyId, 1, 0);
         return $items[0] ?? null;
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string} [size, html, extraCss]
+     */
+    private function buildLogoBlock(?Company $company): array {
+        $size = $this->normalizeLogoSize($company?->getLogoSize());
+        $data = trim((string)($company?->getLogoData() ?? ''));
+        $mime = trim((string)($company?->getLogoMime() ?? ''));
+        if ($data === '' || $mime === '' || !str_starts_with($mime, 'image/')) {
+            return [$size, '', ''];
+        }
+        $bytes = base64_decode($data, true);
+        if ($bytes === false || $bytes === '') {
+            return [$size, '', ''];
+        }
+        $ext = match ($mime) {
+            'image/png' => 'png',
+            'image/jpeg' => 'jpg',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'image/svg+xml' => 'svg',
+            default => 'png',
+        };
+        $companyId = (int)($company->getId() ?? 0);
+        $hash = substr(md5($data), 0, 10);
+        $path = sprintf('%s/nextledger-logo-%d-%s.%s', sys_get_temp_dir(), $companyId, $hash, $ext);
+        if (!file_exists($path) || filesize($path) !== strlen($bytes)) {
+            @file_put_contents($path, $bytes);
+        }
+        if (!file_exists($path)) {
+            return [$size, '', ''];
+        }
+        $heightPx = match ($size) {
+            'small' => 32,
+            'large' => 110,
+            default => 64,
+        };
+        $cssClass = match ($size) {
+            'small' => 'logo-small',
+            'large' => 'logo-large',
+            default => 'logo-medium',
+        };
+        $html = sprintf(
+            '<img class="%s" height="%d" src="%s" alt="logo">',
+            $cssClass,
+            $heightPx,
+            $this->escape($path)
+        );
+        return [$size, $html, ''];
+    }
+
+    private function buildCompanyHeader(string $size, string $logoHtml, string $companyBlock): string {
+        if ($logoHtml === '') {
+            return sprintf('<div class="company">%s</div>', $companyBlock);
+        }
+        return match ($size) {
+            'large' => sprintf(
+                '<div class="logo-banner">%s</div><div class="company">%s</div>',
+                $logoHtml,
+                $companyBlock
+            ),
+            'small' => sprintf(
+                '<table class="header"><tr>'
+                . '<td style="width:55%%; text-align:left">%s</td>'
+                . '<td class="company" style="width:45%%">%s</td>'
+                . '</tr></table>',
+                $logoHtml,
+                $companyBlock
+            ),
+            default => sprintf(
+                '<table class="header"><tr>'
+                . '<td style="width:45%%; text-align:left">%s</td>'
+                . '<td class="company" style="width:55%%">%s</td>'
+                . '</tr></table>',
+                $logoHtml,
+                $companyBlock
+            ),
+        };
+    }
+
+    private function normalizeLogoSize(?string $value): string {
+        $allowed = ['small', 'medium', 'large'];
+        $normalized = strtolower(trim((string)($value ?? '')));
+        return in_array($normalized, $allowed, true) ? $normalized : 'medium';
     }
 
 }

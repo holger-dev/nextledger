@@ -40,6 +40,7 @@ class InvoicePdfService {
         private MiscSettingMapper $miscSettingMapper,
         private ActiveCompanyService $activeCompanyService,
         private DocumentLocaleService $documentLocaleService,
+        private ZugferdXmlService $zugferdXmlService,
     ) {}
 
     /**
@@ -59,17 +60,60 @@ class InvoicePdfService {
 
         $html = $this->renderHtml($invoice, $items, $customer, $company, $texts, $tax, $misc, $offer);
         $content = $this->renderPdf($html);
+
+        $format = $this->normalizeInvoiceFormat($company?->getInvoiceFormat());
+        $isZugferd = false;
+        if ($format === ZugferdXmlService::FORMAT_ZUGFERD && $company !== null) {
+            try {
+                $content = $this->zugferdXmlService->buildZugferdPdf($content, $invoice, $items, $customer, $company, $misc);
+                $isZugferd = true;
+            } catch (\Throwable $e) {
+                // Fall back to a regular PDF if hybrid PDF/A-3 generation fails so the
+                // user still gets a usable invoice. The CII XML can still be downloaded
+                // as a sidecar file via /api/invoices/{id}/zugferd-xml.
+                error_log('NextLedger ZUGFeRD hybrid generation failed: ' . $e->getMessage());
+            }
+        }
+
         $languageCode = $this->documentLocaleService->getCompanyLanguage($company);
-        $filename = sprintf(
-            '%s-%s.pdf',
-            $this->sanitizeFilenamePart($this->documentLocaleService->t($languageCode, 'invoice_filename')),
-            $this->sanitizeFilenamePart((string)($invoice->getNumber() ?: $invoiceId))
-        );
+        $stem = $this->sanitizeFilenamePart($this->documentLocaleService->t($languageCode, 'invoice_filename'));
+        $number = $this->sanitizeFilenamePart((string)($invoice->getNumber() ?: $invoiceId));
+        $filename = $isZugferd
+            ? sprintf('%s-%s-zugferd.pdf', $stem, $number)
+            : sprintf('%s-%s.pdf', $stem, $number);
 
         return [
             'filename' => $filename,
             'content' => $content,
         ];
+    }
+
+    /**
+     * Build the EN16931 CII-XML for an invoice as a sidecar download.
+     */
+    public function buildZugferdXml(int $invoiceId): array {
+        /** @var Invoice $invoice */
+        $invoice = $this->invoiceMapper->find($invoiceId);
+        $companyId = (int)($invoice->getCompanyId() ?: $this->activeCompanyService->getActiveCompanyId());
+        $items = $this->invoiceItemMapper->findByInvoiceId($invoiceId, $companyId);
+        $customer = $this->loadCustomer($invoice->getCustomerId(), $companyId);
+        $company = $this->loadCompany($companyId);
+        $misc = $this->loadMisc($companyId);
+        if ($company === null) {
+            throw new RuntimeException('Aktive Firma nicht gefunden.');
+        }
+        $xml = $this->zugferdXmlService->buildXml($invoice, $items, $customer, $company, $misc);
+        $number = $this->sanitizeFilenamePart((string)($invoice->getNumber() ?: $invoiceId));
+        return [
+            'filename' => sprintf('Rechnung-%s-zugferd.xml', $number),
+            'content' => $xml,
+        ];
+    }
+
+    private function normalizeInvoiceFormat(?string $value): string {
+        $allowed = [ZugferdXmlService::FORMAT_PDF, ZugferdXmlService::FORMAT_ZUGFERD];
+        $normalized = strtolower(trim((string)($value ?? '')));
+        return in_array($normalized, $allowed, true) ? $normalized : ZugferdXmlService::FORMAT_PDF;
     }
 
     private function renderPdf(string $html): string {
@@ -79,7 +123,11 @@ class InvoicePdfService {
 
         $options = new Options();
         $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
         $options->set('defaultFont', 'Helvetica');
+        // dompdf's image cache writes into sys_get_temp_dir(), so make sure that
+        // sits inside the chroot whitelist.
+        $options->set('chroot', [sys_get_temp_dir(), realpath(getcwd())]);
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
@@ -117,6 +165,9 @@ class InvoicePdfService {
                 $this->escape($company->getEmail())
             )
             : '';
+
+        [$logoSize, $logoBlock, $logoCss] = $this->buildLogoBlock($company);
+        $companyHeader = $this->buildCompanyHeader($logoSize, $logoBlock, $companyBlock);
 
         $customerBlock = $customer
             ? sprintf(
@@ -230,12 +281,19 @@ class InvoicePdfService {
             '<html><head><meta charset="UTF-8"><style>
                 @page { margin: 32px 32px 120px 32px; }
                 body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #1f2933; margin: 0; }
+                .header { width: 100%%; border-collapse: collapse; }
+                .header td { vertical-align: top; padding: 0; }
                 .company { text-align: right; font-size: 13px; line-height: 1.4; }
                 .customer { margin-top: 18px; font-size: 13px; line-height: 1.4; }
                 h1 { font-size: 20px; margin: 24px 0 8px; }
-                table { width: 100%%; border-collapse: collapse; margin-top: 12px; }
-                th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 4px; vertical-align: top; }
-                th { text-align: left; background: #f3f4f6; }
+                .logo-small { max-height: 32px; max-width: 220px; }
+                .logo-medium { max-height: 64px; max-width: 260px; }
+                .logo-large { max-height: 110px; max-width: 100%%; display: block; }
+                .logo-banner { width: 100%%; text-align: left; margin-bottom: 14px; }
+                %s
+                table.items { width: 100%%; border-collapse: collapse; margin-top: 12px; }
+                table.items th, table.items td { border-bottom: 1px solid #e5e7eb; padding: 8px 4px; vertical-align: top; }
+                table.items th { text-align: left; background: #f3f4f6; }
                 .totals { margin-top: 12px; text-align: right; }
                 .footer { position: fixed; left: 0; right: 0; bottom: -94px; font-size: 10px; color: #4b5563; border-top: 1px solid #d1d5db; padding-top: 8px; line-height: 1.35; text-align: center; }
                 .footer p { margin: 0 0 4px; }
@@ -245,7 +303,7 @@ class InvoicePdfService {
               %s
               %s
             </div>
-            <div class="company">%s</div>
+            %s
             <div class="customer">%s</div>
             <h1>%s %s</h1>
             <p><strong>%s:</strong> %s</p>
@@ -255,7 +313,7 @@ class InvoicePdfService {
             %s
             <p>%s</p>
             <p>%s</p>
-            <table>
+            <table class="items">
               <thead>
                 <tr>
                   <th>%s</th>
@@ -275,10 +333,11 @@ class InvoicePdfService {
             %s
             %s
             </body></html>',
+            $logoCss,
             nl2br($this->escape($footerText)),
             $bankInfo,
             '',
-            $companyBlock,
+            $companyHeader,
             $customerBlock,
             $this->escape($title),
             $this->escape($invoice->getNumber() ?? ''),
@@ -384,6 +443,95 @@ class InvoicePdfService {
     private function loadMisc(int $companyId): ?MiscSetting {
         $items = $this->miscSettingMapper->findAllByCompanyId($companyId, 1, 0);
         return $items[0] ?? null;
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string} [size, html, extraCss]
+     */
+    private function buildLogoBlock(?Company $company): array {
+        $size = $this->normalizeLogoSize($company?->getLogoSize());
+        $data = trim((string)($company?->getLogoData() ?? ''));
+        $mime = trim((string)($company?->getLogoMime() ?? ''));
+        if ($data === '' || $mime === '' || !str_starts_with($mime, 'image/')) {
+            return [$size, '', ''];
+        }
+        // Decode the base64 once, write the raw bytes to a tempfile, and reference
+        // it by absolute path. dompdf's HTML parsers (both libxml and html5lib)
+        // can corrupt long base64 attribute values, which then makes GD fail with
+        // "IDAT: incorrect data check". Going via the filesystem avoids that.
+        $bytes = base64_decode($data, true);
+        if ($bytes === false || $bytes === '') {
+            return [$size, '', ''];
+        }
+        $ext = match ($mime) {
+            'image/png' => 'png',
+            'image/jpeg' => 'jpg',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'image/svg+xml' => 'svg',
+            default => 'png',
+        };
+        $companyId = (int)($company->getId() ?? 0);
+        $hash = substr(md5($data), 0, 10);
+        $path = sprintf('%s/nextledger-logo-%d-%s.%s', sys_get_temp_dir(), $companyId, $hash, $ext);
+        if (!file_exists($path) || filesize($path) !== strlen($bytes)) {
+            @file_put_contents($path, $bytes);
+        }
+        if (!file_exists($path)) {
+            return [$size, '', ''];
+        }
+        $heightPx = match ($size) {
+            'small' => 32,
+            'large' => 110,
+            default => 64,
+        };
+        $cssClass = match ($size) {
+            'small' => 'logo-small',
+            'large' => 'logo-large',
+            default => 'logo-medium',
+        };
+        $html = sprintf(
+            '<img class="%s" height="%d" src="%s" alt="logo">',
+            $cssClass,
+            $heightPx,
+            $this->escape($path)
+        );
+        return [$size, $html, ''];
+    }
+
+    private function buildCompanyHeader(string $size, string $logoHtml, string $companyBlock): string {
+        if ($logoHtml === '') {
+            return sprintf('<div class="company">%s</div>', $companyBlock);
+        }
+        return match ($size) {
+            'large' => sprintf(
+                '<div class="logo-banner">%s</div><div class="company">%s</div>',
+                $logoHtml,
+                $companyBlock
+            ),
+            'small' => sprintf(
+                '<table class="header"><tr>'
+                . '<td style="width:55%%; text-align:left">%s</td>'
+                . '<td class="company" style="width:45%%">%s</td>'
+                . '</tr></table>',
+                $logoHtml,
+                $companyBlock
+            ),
+            default => sprintf(
+                '<table class="header"><tr>'
+                . '<td style="width:45%%; text-align:left">%s</td>'
+                . '<td class="company" style="width:55%%">%s</td>'
+                . '</tr></table>',
+                $logoHtml,
+                $companyBlock
+            ),
+        };
+    }
+
+    private function normalizeLogoSize(?string $value): string {
+        $allowed = ['small', 'medium', 'large'];
+        $normalized = strtolower(trim((string)($value ?? '')));
+        return in_array($normalized, $allowed, true) ? $normalized : 'medium';
     }
 
 }

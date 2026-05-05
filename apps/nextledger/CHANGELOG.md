@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.6.3
+- Add per-company logo upload (PNG, JPEG, SVG, GIF, WebP up to 1.5 MB) stored alongside the company record.
+- Add three PDF layout sizes for the logo (`small`, `medium`, `large`) which adjust the offer and invoice header automatically: small/medium place the logo next to the address block, large renders a banner above the address.
+- Add per-company invoice format selector: classic PDF (default, unchanged) or **ZUGFeRD EN16931** (PDF/A-3 with embedded Cross Industry Invoice XML) for German B2B/B2G electronic invoicing. Falls back to a regular PDF if the host's PHP environment cannot generate a hybrid PDF/A-3.
+- Add a sidecar XML download per invoice at `GET /api/invoices/{id}/zugferd-xml` — returns the EN16931 CII-XML on its own, regardless of the invoice format setting. Useful for pure XRechnung delivery or when a recipient prefers separate XML and PDF.
+- Add per-company `country_code` (ISO-3166-1 alpha-2, default `DE`) and per-customer `country_code` and `vat_id` to satisfy EN16931 mandatory fields.
+- New service `OCA\NextLedger\Service\ZugferdXmlService` builds CII-XML (profile EN16931) from invoice + items + customer + company. Includes a defensive workaround for hosts where the `horstoeko/zugferd` XMP asset is not directly readable (the file is copied into a writable temp directory before use).
+- New endpoints under `/api/settings/company/logo` (GET/POST/DELETE) for upload, retrieval, and removal.
+- Add per-company **mail attachment** setting (PDF only / ZUGFeRD-XML only / both). Direct email sends from NextLedger now respect this preference and attach the corresponding file(s) automatically. Defaults to PDF for legacy behaviour.
+- Add a **Download ZUGFeRD-XML** button next to the Download-PDF button on every invoice in the list view.
+- Composer dependencies added: `horstoeko/zugferd ^1.0`, `setasign/fpdi ^2.6`. The `composer.json` pins `config.platform.php` to `8.3` so dependency resolution stays compatible with the typical Nextcloud 32 environment.
+
 ## 1.6.1
 - Add a per-company document language setting, defaulting to the Nextcloud language.
 - Render invoice and offer PDF labels, dates, amounts, and totals in the company's selected document language.

@@ -119,6 +119,16 @@
                 </NcButton>
                 <NcButton
                   type="tertiary-no-background"
+                  :aria-label="t('downloadZugferdXml')"
+                  :title="t('downloadZugferdXml')"
+                  @click="downloadZugferdXml(invoice)"
+                >
+                  <template #icon>
+                    <CodeJson :size="18" />
+                  </template>
+                </NcButton>
+                <NcButton
+                  type="tertiary-no-background"
                   :aria-label="t('markInvoicePaid')"
                   :title="t('markAsPaid')"
                   :disabled="invoice.status === 'paid'"
@@ -187,6 +197,9 @@
           <p>{{ directDeliveryHint }}</p>
           <div class="email-preview">
             <p><strong>{{ t('recipient') }}:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
+            <p v-if="!sendInvoicePreview?.to?.length" class="error">
+              {{ t('noRecipientHint') }}
+            </p>
             <p v-if="effectiveFromEmail"><strong>{{ t('sender') }}:</strong> {{ effectiveFromEmail }}</p>
             <p v-if="effectiveReplyToEmail"><strong>{{ t('replyTo') }}:</strong> {{ effectiveReplyToEmail }}</p>
             <p><strong>{{ t('subject') }}:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
@@ -238,6 +251,7 @@ import { NcButton, NcEmptyContent, NcLoadingIcon, NcModal } from '@nextcloud/vue
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import CheckCircleOutline from 'vue-material-design-icons/CheckCircleOutline.vue'
+import CodeJson from 'vue-material-design-icons/CodeJson.vue'
 import DownloadBoxOutline from 'vue-material-design-icons/DownloadBoxOutline.vue'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
@@ -245,6 +259,7 @@ import TrashCanOutline from 'vue-material-design-icons/TrashCanOutline.vue'
 import {
   deleteInvoice,
   getInvoicePdfUrl,
+  getInvoiceZugferdXmlUrl,
   getInvoices,
   sendInvoiceEmail,
   updateInvoice,
@@ -252,7 +267,7 @@ import {
 import { getInvoiceItems } from '../api/invoiceItems'
 import { getCases } from '../api/cases'
 import { getCustomers } from '../api/customers'
-import { getEmailBehavior, getTexts } from '../api/settings'
+import { getCompany, getEmailBehavior, getTexts } from '../api/settings'
 
 export default {
   name: 'Invoices',
@@ -264,6 +279,7 @@ export default {
     NcSelect,
     NcTextField,
     CheckCircleOutline,
+    CodeJson,
     DownloadBoxOutline,
     EmailOutline,
     Pencil,
@@ -279,6 +295,7 @@ export default {
       cases: [],
       texts: null,
       emailBehavior: null,
+      company: null,
       expandedId: null,
       invoiceItems: [],
       filterCustomerId: null,
@@ -368,18 +385,20 @@ export default {
       this.loading = true
       this.error = ''
       try {
-        const [invoices, customers, cases, texts, emailBehavior] = await Promise.all([
+        const [invoices, customers, cases, texts, emailBehavior, company] = await Promise.all([
           getInvoices(),
           getCustomers(),
           getCases(),
           getTexts(),
           getEmailBehavior(),
+          getCompany().catch(() => null),
         ])
         this.invoices = Array.isArray(invoices) ? invoices : []
         this.customers = Array.isArray(customers) ? customers : []
         this.cases = Array.isArray(cases) ? cases : []
         this.texts = texts || {}
         this.emailBehavior = emailBehavior || { mode: 'manual' }
+        this.company = company || null
       } catch (e) {
         this.error = this.t('loadError')
       } finally {
@@ -466,6 +485,10 @@ export default {
       const url = getInvoicePdfUrl(invoice.id)
       window.open(url, '_blank')
     },
+    downloadZugferdXml(invoice) {
+      const url = getInvoiceZugferdXmlUrl(invoice.id)
+      window.open(url, '_blank')
+    },
     openSendInvoiceModal(invoice) {
       this.sendInvoiceTarget = invoice
       this.sendInvoiceError = ''
@@ -536,8 +559,18 @@ export default {
       }
     },
     buildInvoiceAttachmentName(invoice) {
+      // Returns a comma-separated list of attachment filenames matching the
+      // active company's mailAttachment setting (pdf | xml | both).
       const suffix = invoice.number || invoice.id
-      return `rechnung-${suffix}.pdf`
+      const mode = (this.company?.mailAttachment || 'pdf').toLowerCase()
+      const files = []
+      if (mode === 'pdf' || mode === 'both') {
+        files.push(`Rechnung-${suffix}.pdf`)
+      }
+      if (mode === 'xml' || mode === 'both') {
+        files.push(`Rechnung-${suffix}-zugferd.xml`)
+      }
+      return files.join(', ')
     },
     async sendInvoiceDirect() {
       if (!this.sendInvoiceTarget || !this.sendInvoicePreview) {
@@ -762,11 +795,31 @@ export default {
   flex-wrap: wrap;
 }
 
+.modal__content {
+  margin: calc(var(--default-grid-baseline) * 4);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal__content .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
 .email-preview {
   background: var(--color-background-dark, #f3f4f6);
+  border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 8px;
   padding: 12px;
   margin: 12px 0;
+}
+
+.email-preview p {
+  margin: 4px 0;
 }
 
 .email-body {

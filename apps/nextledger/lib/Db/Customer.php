@@ -19,6 +19,8 @@ class Customer extends Entity {
     public $billingEmail;
     public $sendInvoiceToBillingEmail;
     public $sendInvoiceToContactEmail;
+    public $countryCode;
+    public $vatId;
     public $createdAt;
     public $updatedAt;
 
@@ -34,6 +36,8 @@ class Customer extends Entity {
         $this->addType('billingEmail', 'string');
         $this->addType('sendInvoiceToBillingEmail', 'boolean');
         $this->addType('sendInvoiceToContactEmail', 'boolean');
+        $this->addType('countryCode', 'string');
+        $this->addType('vatId', 'string');
         $this->addType('createdAt', 'integer');
         $this->addType('updatedAt', 'integer');
     }

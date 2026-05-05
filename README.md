@@ -46,6 +46,8 @@ Kleinunternehmerregelung und Standard-USt.
 - **Multi-Company support** with one active company context at a time
 - **Customers, Products/DL, Cases, Elements** scoped to the active company
 - **Offers & Invoices** with positions, tax logic, and PDF export
+- **Per‑Company logo** with three PDF layout sizes (1.6.3)
+- **ZUGFeRD EN16931 e‑invoicing** as PDF/A‑3 with embedded CII‑XML, switchable per company (1.6.3)
 - **Optional PDF auto-storage** to Nextcloud Files with overwrite or versioning
 - **Numbering** `YYYYMMDD-####` for offers and invoices
 - **Mail‑to workflow** for offers/invoices (auto‑download PDF + template mail)
@@ -68,6 +70,23 @@ Kleinunternehmerregelung und Standard-USt.
 - Optional automatic filing to `Files/NextLedger/<Firma>/<Wirtschaftsjahr>`
 - Storage mode can be configured:
   overwrite existing file, or create versioned files (`..._v1`, `..._v2`, ...)
+
+### Logo (1.6.3)
+- Upload one logo per company under **Settings → Firma → Logo** (PNG, JPEG, SVG, GIF, WebP, max. 1.5 MB)
+- Choose one of three layout sizes:
+  - `small` — 32 px high, sits next to the right‑aligned address block
+  - `medium` — 64 px high, sits next to the right‑aligned address block (default)
+  - `large` — 110 px high banner placed above the address block
+- The logo is stored Base64‑encoded inside the company record (no extra Files storage needed) and is embedded into every offer and invoice PDF as a data‑URI
+
+### ZUGFeRD / E‑Rechnung (1.6.3)
+- Per company, choose **Settings → Firma → Rechnungsausgabe**: classic PDF (default) or **ZUGFeRD EN16931**
+- ZUGFeRD generates a PDF/A‑3 with an embedded Cross Industry Invoice XML (UN/CEFACT, profile EN16931)
+- Mandatory data: company name + address + country code, VAT‑ID **or** tax number, customer name + address + country code, VAT‑ID for B2B; bank IBAN is included as payment means when present
+- Generated filenames are suffixed `-zugferd.pdf`
+- A **sidecar XML download** is always available at `GET /api/invoices/{id}/zugferd-xml`. Use this when the recipient wants pure XRechnung XML, or when the hybrid PDF/A‑3 cannot be produced on your host (the regular PDF is then used and the XML can be attached separately).
+- Validation against the [Mustang validator](https://github.com/ZUGFeRD/mustangproject) or [KoSIT XRechnung Validator](https://github.com/itplr-kosit/validator) is recommended before going live
+- After updating, run `composer install --no-dev --prefer-dist` inside `apps/nextledger` to pull `horstoeko/zugferd` and `setasign/fpdi`
 
 ### Multi-Company
 - Manage multiple companies under **Settings → Firma**

@@ -10,6 +10,20 @@ const del = (path) => axios.delete(generateUrl(`${base}/${path}`)).then((r) => r
 
 export const getCompany = () => get('company')
 export const saveCompany = (payload) => put('company', payload)
+export const getCompanyLogo = () => get('company/logo')
+export const uploadCompanyLogo = (file, logoSize) => {
+	const data = new FormData()
+	data.append('file', file)
+	if (logoSize) {
+		data.append('logoSize', logoSize)
+	}
+	return axios
+		.post(generateUrl(`${base}/company/logo`), data, {
+			headers: { 'Content-Type': 'multipart/form-data' },
+		})
+		.then((r) => r.data)
+}
+export const deleteCompanyLogo = () => del('company/logo')
 export const getCompanyOwnershipRecovery = () => get('company-ownership-recovery')
 export const claimCompanyOwnershipRecovery = (payload) => post('company-ownership-recovery', payload)
 export const getCompanies = () => get('companies')

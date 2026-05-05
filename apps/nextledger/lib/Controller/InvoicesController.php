@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\CaseEntityMapper;
+use OCA\NextLedger\Db\CompanyMapper;
 use OCA\NextLedger\Db\CustomerMapper;
 use OCA\NextLedger\Db\FiscalYearMapper;
 use OCA\NextLedger\Db\Income;
@@ -44,6 +45,7 @@ class InvoicesController extends ApiController {
         private IMailProviderManager $mailProviderManager,
         private CaseEntityMapper $caseMapper,
         private CustomerMapper $customerMapper,
+        private CompanyMapper $companyMapper,
         private ActiveCompanyService $activeCompanyService,
         private DocumentStorageService $documentStorageService,
     ) {
@@ -281,6 +283,32 @@ class InvoicesController extends ApiController {
      * @NoAdminRequired
      * @NoCSRFRequired
      */
+    /**
+     * Sidecar download for the ZUGFeRD CII-XML of an invoice.
+     * Useful when the recipient requires pure XRechnung XML or when the
+     * hybrid PDF/A-3 generation is not available on the host.
+     *
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function zugferdXml(string $id): Response {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $invoiceId = (int)$id;
+        try {
+            $this->invoiceMapper->findByIdAndCompanyId($invoiceId, $companyId);
+            $result = $this->invoicePdfService->buildZugferdXml($invoiceId);
+        } catch (DoesNotExistException | MultipleObjectsReturnedException $e) {
+            return new JSONResponse(['message' => 'Rechnung nicht gefunden.'], Http::STATUS_NOT_FOUND);
+        } catch (\Throwable $e) {
+            return new JSONResponse(['message' => 'XML konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+        return new DataDownloadResponse($result['content'], $result['filename'], 'application/xml');
+    }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
     public function pdf(string $id): Response {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceId = (int)$id;
@@ -332,25 +360,57 @@ class InvoicesController extends ApiController {
             return new JSONResponse(['message' => 'Keine gültigen Empfänger gefunden.'], Http::STATUS_BAD_REQUEST);
         }
 
+        $mailAttachment = $this->resolveMailAttachmentSetting($companyId);
+        $attachments = [];
         try {
-            $result = $this->invoicePdfService->buildPdf($invoice->getId());
-            $this->documentStorageService->storeGeneratedPdf(
-                (string)($invoice->getNumber() ?: ('invoice-' . $invoice->getId())),
-                $invoice->getIssueDate(),
-                $result['content'],
-                'invoice'
-            );
+            if ($mailAttachment === 'pdf' || $mailAttachment === 'both') {
+                $pdf = $this->invoicePdfService->buildPdf($invoice->getId());
+                $this->documentStorageService->storeGeneratedPdf(
+                    (string)($invoice->getNumber() ?: ('invoice-' . $invoice->getId())),
+                    $invoice->getIssueDate(),
+                    $pdf['content'],
+                    'invoice'
+                );
+                $attachments[] = [
+                    'filename' => $pdf['filename'],
+                    'content' => $pdf['content'],
+                    'mime' => 'application/pdf',
+                ];
+            }
+            if ($mailAttachment === 'xml' || $mailAttachment === 'both') {
+                $xml = $this->invoicePdfService->buildZugferdXml($invoice->getId());
+                $attachments[] = [
+                    'filename' => $xml['filename'],
+                    'content' => $xml['content'],
+                    'mime' => 'application/xml',
+                ];
+            }
         } catch (\Throwable $e) {
-            return new JSONResponse(['message' => 'PDF konnte nicht erzeugt werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+            return new JSONResponse(['message' => 'Anhang konnte nicht erzeugt werden: ' . $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+
+        if (empty($attachments)) {
+            return new JSONResponse(['message' => 'Es wurde keine Datei zum Anhängen erzeugt.'], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
 
         try {
-            $this->sendWithAttachment($recipients, (string)$subject, (string)$body, $result['filename'], $result['content']);
+            $this->sendWithAttachments($recipients, (string)$subject, (string)$body, $attachments);
         } catch (\Throwable $e) {
             return new JSONResponse(['message' => 'E-Mail konnte nicht gesendet werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
 
         return new JSONResponse(['status' => 'sent']);
+    }
+
+    private function resolveMailAttachmentSetting(int $companyId): string {
+        try {
+            /** @var \OCA\NextLedger\Db\Company $entity */
+            $entity = $this->companyMapper->find($companyId);
+            $mode = strtolower(trim((string)($entity->getMailAttachment() ?? 'pdf')));
+            return in_array($mode, ['pdf', 'xml', 'both'], true) ? $mode : 'pdf';
+        } catch (\Throwable $e) {
+            return 'pdf';
+        }
     }
 
     private function syncIncome(Invoice $invoice, int $companyId): void {
@@ -434,15 +494,17 @@ class InvoicesController extends ApiController {
         return array_values(array_unique($recipients));
     }
 
-    private function sendWithAttachment(array $recipients, string $subject, string $body, string $filename, string $content): void {
+    /**
+     * @param array<int, array{filename: string, content: string, mime: string}> $attachments
+     */
+    private function sendWithAttachments(array $recipients, string $subject, string $body, array $attachments): void {
         $delivery = $this->emailSettingsService->getDeliveryConfig();
         if ($delivery['mode'] === 'nextcloud_mail') {
             $this->sendWithMailProvider(
                 $recipients,
                 $subject,
                 $body,
-                $filename,
-                $content,
+                $attachments,
                 (string)$delivery['providerId'],
                 (string)$delivery['serviceId']
             );
@@ -462,22 +524,31 @@ class InvoicesController extends ApiController {
             $message->setReplyTo([$emails['replyToEmail']]);
         }
 
-        $tmpPath = $this->writeTempAttachment($filename, $content);
+        $tempPaths = [];
         try {
-            $attachment = $this->mailer->createAttachmentFromPath($tmpPath);
-            $message->attach($attachment);
+            foreach ($attachments as $att) {
+                $tempPaths[] = $this->writeTempAttachment($att['filename'], $att['content']);
+            }
+            foreach ($tempPaths as $i => $path) {
+                $attachment = $this->mailer->createAttachmentFromPath($path);
+                $message->attach($attachment);
+            }
             $this->mailer->send($message);
         } finally {
-            @unlink($tmpPath);
+            foreach ($tempPaths as $path) {
+                @unlink($path);
+            }
         }
     }
 
+    /**
+     * @param array<int, array{filename: string, content: string, mime: string}> $attachments
+     */
     private function sendWithMailProvider(
         array $recipients,
         string $subject,
         string $body,
-        string $filename,
-        string $content,
+        array $attachments,
         string $providerId,
         string $serviceId
     ): void {
@@ -514,9 +585,11 @@ class InvoicesController extends ApiController {
             $message->setReplyTo(new Address($replyToEmail));
         }
 
-        $message->setAttachments(
-            new Attachment($content, $filename, 'application/pdf')
+        $providerAttachments = array_map(
+            static fn(array $a) => new Attachment($a['content'], $a['filename'], $a['mime']),
+            $attachments
         );
+        $message->setAttachments(...$providerAttachments);
         $service->sendMessage($message);
     }
 
