@@ -2,6 +2,9 @@
 
 A lightweight, Nextcloud‑native bookkeeping app for freelancers and small teams. Track customers, cases, offers, invoices, products, fiscal years, and GÜB (EÜR) — all inside Nextcloud with a familiar UI.
 
+## Video
+[Informationvideo in German on YouTube](https://youtu.be/g-ZRCY9yc5s)
+
 ## Screenshots
 Below are a few highlights from the UI and PDF output. The first four are intended for store listings; the rest are extra context for GitHub.
 
