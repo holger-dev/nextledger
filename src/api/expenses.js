@@ -15,3 +15,16 @@ export const updateExpense = (id, payload) =>
 
 export const deleteExpense = (id) =>
   axios.delete(generateUrl(`${itemBase}/${id}`)).then((r) => r.data)
+
+export const uploadExpenseAttachment = (id, file) => {
+  const data = new FormData()
+  data.append('file', file)
+  return axios
+    .post(generateUrl(`${itemBase}/${id}/attachment`), data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((r) => r.data)
+}
+
+export const deleteExpenseAttachment = (id) =>
+  axios.delete(generateUrl(`${itemBase}/${id}/attachment`)).then((r) => r.data)

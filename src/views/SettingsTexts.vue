@@ -35,6 +35,16 @@
           <p class="text-block__hint">{{ t('footerHint') }}</p>
           <NcTextArea :label="t('footerLabel')" :value.sync="form.footerText" />
         </div>
+
+        <div class="text-block">
+          <p class="text-block__hint">{{ t('closingGreetingHint') }}</p>
+          <NcTextField :label="t('closingGreetingLabel')" :value.sync="form.closingGreeting" />
+        </div>
+
+        <div class="text-block">
+          <p class="text-block__hint">{{ t('signatureNameHint') }}</p>
+          <NcTextField :label="t('signatureNameLabel')" :value.sync="form.signatureName" />
+        </div>
       </div>
 
       <div class="section">
@@ -102,6 +112,7 @@
 <script>
 import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
+import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import { getTexts, saveTexts } from '../api/settings'
 
 export default {
@@ -110,6 +121,7 @@ export default {
     NcButton,
     NcLoadingIcon,
     NcTextArea,
+    NcTextField,
   },
   data() {
     return {
@@ -127,6 +139,8 @@ export default {
         offerEmailBody: '',
         invoiceEmailSubject: '',
         invoiceEmailBody: '',
+        closingGreeting: '',
+        signatureName: '',
       },
     }
   },
@@ -154,6 +168,8 @@ export default {
           offerEmailBody: safeString(data.offerEmailBody),
           invoiceEmailSubject: safeString(data.invoiceEmailSubject),
           invoiceEmailBody: safeString(data.invoiceEmailBody),
+          closingGreeting: safeString(data.closingGreeting),
+          signatureName: safeString(data.signatureName),
         }
       } catch (e) {
         this.error = this.t('loadError')

@@ -103,20 +103,12 @@ class OfferPdfService {
         $issueDate = $this->documentLocaleService->formatDate($offer->getIssueDate(), $languageCode);
         $validUntil = $this->documentLocaleService->formatDate($offer->getValidUntil(), $languageCode);
 
-        $companyBlock = $company
-            ? sprintf(
-                '%s<br>%s %s<br>%s %s<br>%s',
-                $this->escape($company->getName()),
-                $this->escape($company->getStreet()),
-                $this->escape($company->getHouseNumber()),
-                $this->escape($company->getZip()),
-                $this->escape($company->getCity()),
-                $this->escape($company->getEmail())
-            )
-            : '';
+        $layout = $this->getDocLayout($company);
+        $companyBlock = $this->buildCompanyBlock($company, $layout);
 
         [$logoSize, $logoBlock, $logoCss] = $this->buildLogoBlock($company);
-        $companyHeader = $this->buildCompanyHeader($logoSize, $logoBlock, $companyBlock);
+        $companyHeader = $this->buildCompanyHeader($logoSize, $logoBlock, $companyBlock, $layout);
+        $bodyFontPx = $this->resolveFontSize($layout);
 
         $customerBlock = $customer
             ? sprintf(
@@ -151,22 +143,26 @@ class OfferPdfService {
         $greeting = $offer->getGreetingText() ?? $texts?->getOfferGreeting() ?? '';
         $extraText = $offer->getExtraText() ?? '';
         $closingText = $texts?->getOfferClosingText() ?? '';
-        $ownerName = $company?->getOwnerName();
         $closingTextBlock = $closingText
             ? sprintf('<p>%s</p>', nl2br($this->escape($closingText)))
             : '';
-        $closingBlock = $ownerName
+        // Issue #15: configurable greeting formula + signature name
+        $greetingFormula = trim((string)($texts?->getClosingGreeting() ?? ''))
+            ?: $this->t($languageCode, 'closing_greeting');
+        $signatureName = trim((string)($texts?->getSignatureName() ?? ''))
+            ?: (string)($company?->getOwnerName() ?? '');
+        $closingBlock = $signatureName !== ''
             ? sprintf(
                 '<p>%s</p><p>&nbsp;</p><p>%s</p>',
-                $this->escape($this->t($languageCode, 'closing_greeting')),
-                $this->escape($ownerName)
+                $this->escape($greetingFormula),
+                $this->escape($signatureName)
             )
-            : sprintf('<p>%s</p>', $this->escape($this->t($languageCode, 'closing_greeting')));
+            : sprintf('<p>%s</p>', $this->escape($greetingFormula));
 
         return sprintf(
             '<html><head><meta charset="UTF-8"><style>
                 @page { margin: 32px 32px 110px 32px; }
-                body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #1f2933; margin: 0; padding-bottom: 90px; }
+                body { font-family: Helvetica, Arial, sans-serif; font-size: %dpx; color: #1f2933; margin: 0; padding-bottom: 90px; }
                 .header { width: 100%%; border-collapse: collapse; }
                 .header td { vertical-align: top; padding: 0; }
                 .company { text-align: right; font-size: 13px; line-height: 1.4; }
@@ -214,6 +210,7 @@ class OfferPdfService {
               %s
             </div>
             </body></html>',
+            $bodyFontPx,
             $logoCss,
             $companyHeader,
             $customerBlock,
@@ -351,33 +348,103 @@ class OfferPdfService {
         return [$size, $html, ''];
     }
 
-    private function buildCompanyHeader(string $size, string $logoHtml, string $companyBlock): string {
-        if ($logoHtml === '') {
-            return sprintf('<div class="company">%s</div>', $companyBlock);
+    /**
+     * @return array{showVatId: bool, showTaxId: bool, showPhone: bool, showEmail: bool, companyBlockPosition: string, fontSize: string}
+     */
+    private function getDocLayout(?Company $company): array {
+        $defaults = [
+            'showVatId' => false,
+            'showTaxId' => false,
+            'showPhone' => false,
+            'showEmail' => true,
+            'companyBlockPosition' => 'right',
+            'fontSize' => 'normal',
+        ];
+        $raw = trim((string)($company?->getDocLayout() ?? ''));
+        if ($raw === '') {
+            return $defaults;
         }
-        return match ($size) {
-            'large' => sprintf(
-                '<div class="logo-banner">%s</div><div class="company">%s</div>',
-                $logoHtml,
-                $companyBlock
-            ),
-            'small' => sprintf(
-                '<table class="header"><tr>'
-                . '<td style="width:55%%; text-align:left">%s</td>'
-                . '<td class="company" style="width:45%%">%s</td>'
-                . '</tr></table>',
-                $logoHtml,
-                $companyBlock
-            ),
-            default => sprintf(
-                '<table class="header"><tr>'
-                . '<td style="width:45%%; text-align:left">%s</td>'
-                . '<td class="company" style="width:55%%">%s</td>'
-                . '</tr></table>',
-                $logoHtml,
-                $companyBlock
-            ),
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return $defaults;
+        }
+        $layout = array_merge($defaults, array_intersect_key($decoded, $defaults));
+        $layout['companyBlockPosition'] = in_array($layout['companyBlockPosition'], ['left', 'right'], true)
+            ? $layout['companyBlockPosition'] : 'right';
+        $layout['fontSize'] = in_array($layout['fontSize'], ['small', 'normal', 'large'], true)
+            ? $layout['fontSize'] : 'normal';
+        foreach (['showVatId', 'showTaxId', 'showPhone', 'showEmail'] as $flag) {
+            $layout[$flag] = (bool)$layout[$flag];
+        }
+        return $layout;
+    }
+
+    private function resolveFontSize(array $layout): int {
+        return match ($layout['fontSize']) {
+            'small' => 11,
+            'large' => 13,
+            default => 12,
         };
+    }
+
+    private function buildCompanyBlock(?Company $company, array $layout): string {
+        if ($company === null) {
+            return '';
+        }
+        $lines = [
+            $this->escape($company->getName()),
+            trim($this->escape($company->getStreet()) . ' ' . $this->escape($company->getHouseNumber())),
+            trim($this->escape($company->getZip()) . ' ' . $this->escape($company->getCity())),
+        ];
+        if ($layout['showEmail'] && $company->getEmail()) {
+            $lines[] = $this->escape($company->getEmail());
+        }
+        if ($layout['showPhone'] && $company->getPhone()) {
+            $lines[] = $this->escape($company->getPhone());
+        }
+        if ($layout['showVatId'] && $company->getVatId()) {
+            $lines[] = 'USt-IdNr.: ' . $this->escape($company->getVatId());
+        }
+        if ($layout['showTaxId'] && $company->getTaxId()) {
+            $lines[] = 'St.-Nr.: ' . $this->escape($company->getTaxId());
+        }
+        return implode('<br>', array_filter($lines, static fn(string $line): bool => $line !== ''));
+    }
+
+    private function buildCompanyHeader(string $size, string $logoHtml, string $companyBlock, array $layout = []): string {
+        $position = $layout['companyBlockPosition'] ?? 'right';
+        $align = $position === 'left' ? 'left' : 'right';
+        $companyDiv = sprintf('<div class="company" style="text-align:%s">%s</div>', $align, $companyBlock);
+        if ($logoHtml === '') {
+            return $companyDiv;
+        }
+        if ($size === 'large') {
+            return sprintf('<div class="logo-banner">%s</div>%s', $logoHtml, $companyDiv);
+        }
+        $logoWidth = $size === 'small' ? 55 : 45;
+        $companyWidth = 100 - $logoWidth;
+        if ($position === 'left') {
+            return sprintf(
+                '<table class="header"><tr>'
+                . '<td class="company" style="width:%d%%; text-align:left">%s</td>'
+                . '<td style="width:%d%%; text-align:right">%s</td>'
+                . '</tr></table>',
+                $companyWidth,
+                $companyBlock,
+                $logoWidth,
+                $logoHtml
+            );
+        }
+        return sprintf(
+            '<table class="header"><tr>'
+            . '<td style="width:%d%%; text-align:left">%s</td>'
+            . '<td class="company" style="width:%d%%; text-align:right">%s</td>'
+            . '</tr></table>',
+            $logoWidth,
+            $logoHtml,
+            $companyWidth,
+            $companyBlock
+        );
     }
 
     private function normalizeLogoSize(?string $value): string {

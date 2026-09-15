@@ -81,6 +81,57 @@ class DocumentStorageService {
         return $relativeFolder . '/' . $targetName;
     }
 
+    /**
+     * Store a receipt file for an expense (issue #16). Unlike PDF auto-store,
+     * receipts are always written when the user uploads one — no setting gate.
+     * Returns the path relative to the user's files root, or null on failure.
+     */
+    public function storeExpenseReceipt(
+        string $expenseLabel,
+        ?int $bookedAtTs,
+        string $filename,
+        string $content,
+    ): ?string {
+        $user = $this->userSession->getUser();
+        if (!$user || !method_exists($user, 'getUID')) {
+            return null;
+        }
+
+        $company = $this->activeCompanyService->getActiveCompany();
+        $companyId = (int)$company->getId();
+        $fiscalYear = $this->resolveFiscalYear($companyId, $bookedAtTs);
+        $fiscalYearLabel = $fiscalYear?->getName() ?: 'Ohne Wirtschaftsjahr';
+        $companyLabel = $company->getName() ?: ('Firma-' . $companyId);
+
+        $relativeFolder = implode('/', [
+            'NextLedger',
+            $this->sanitizePathPart($companyLabel),
+            $this->sanitizePathPart($fiscalYearLabel),
+            'Belege',
+        ]);
+        $folder = $this->ensureFolder($this->rootFolder->getUserFolder($user->getUID()), $relativeFolder);
+
+        $safeLabel = $this->sanitizeFileName($expenseLabel);
+        $safeOriginal = $this->sanitizeFileName($filename);
+        $targetName = $safeLabel !== '' && $safeLabel !== 'dokument'
+            ? sprintf('%s-%s', $safeLabel, $safeOriginal)
+            : $safeOriginal;
+
+        // never overwrite an existing receipt — add a numeric suffix instead
+        $finalName = $targetName;
+        $counter = 1;
+        while ($folder->nodeExists($finalName)) {
+            $dot = strrpos($targetName, '.');
+            $finalName = $dot === false
+                ? sprintf('%s_%d', $targetName, $counter)
+                : sprintf('%s_%d%s', substr($targetName, 0, $dot), $counter, substr($targetName, $dot));
+            $counter++;
+        }
+
+        $this->writeFileContent($folder, $finalName, $content);
+        return $relativeFolder . '/' . $finalName;
+    }
+
     private function writeFileContent(Folder $folder, string $targetName, string $content): void {
         if ($folder->nodeExists($targetName)) {
             $node = $folder->get($targetName);

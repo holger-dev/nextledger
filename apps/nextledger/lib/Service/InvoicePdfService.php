@@ -152,22 +152,28 @@ class InvoicePdfService {
     ): string {
         $languageCode = $this->documentLocaleService->getCompanyLanguage($company);
         $issueDate = $this->documentLocaleService->formatDate($invoice->getIssueDate(), $languageCode);
-        $dueDate = $this->documentLocaleService->formatDate($invoice->getDueDate(), $languageCode);
 
-        $companyBlock = $company
-            ? sprintf(
-                '%s<br>%s %s<br>%s %s<br>%s',
-                $this->escape($company->getName()),
-                $this->escape($company->getStreet()),
-                $this->escape($company->getHouseNumber()),
-                $this->escape($company->getZip()),
-                $this->escape($company->getCity()),
-                $this->escape($company->getEmail())
-            )
-            : '';
+        // Issue #19: hide the "due until" line entirely when no due date is set
+        // instead of rendering a dash placeholder.
+        $dateBlock = sprintf(
+            '<p><strong>%s:</strong> %s%s</p>',
+            $this->escape($this->t($languageCode, 'date')),
+            $issueDate,
+            $invoice->getDueDate()
+                ? sprintf(
+                    '<br><strong>%s:</strong> %s',
+                    $this->escape($this->t($languageCode, 'due_until')),
+                    $this->documentLocaleService->formatDate($invoice->getDueDate(), $languageCode)
+                )
+                : ''
+        );
+
+        $layout = $this->getDocLayout($company);
+        $companyBlock = $this->buildCompanyBlock($company, $layout);
 
         [$logoSize, $logoBlock, $logoCss] = $this->buildLogoBlock($company);
-        $companyHeader = $this->buildCompanyHeader($logoSize, $logoBlock, $companyBlock);
+        $companyHeader = $this->buildCompanyHeader($logoSize, $logoBlock, $companyBlock, $layout);
+        $bodyFontPx = $this->resolveFontSize($layout);
 
         $customerBlock = $customer
             ? sprintf(
@@ -181,22 +187,73 @@ class InvoicePdfService {
             )
             : '';
 
+        // Issue #24: per-position VAT rates. An item without its own rate inherits
+        // the invoice-level rate. When mixed rates are present, the table gains a
+        // VAT column and the totals block lists one tax line per rate group.
+        $hasItemRates = false;
+        foreach ($items as $item) {
+            if ($item->getTaxRateBp() !== null) {
+                $hasItemRates = true;
+                break;
+            }
+        }
+        $defaultRateBp = (int)($invoice->getTaxRateBp() ?? 0);
+        $showVatColumn = $hasItemRates && !$invoice->getIsSmallBusiness();
+
         $rows = '';
         foreach ($items as $item) {
+            $itemRateBp = $invoice->getIsSmallBusiness() ? 0 : (int)($item->getTaxRateBp() ?? $defaultRateBp);
+            $vatCell = $showVatColumn
+                ? sprintf(
+                    '<td style="text-align:right">%s%%</td>',
+                    $this->documentLocaleService->formatPercent($itemRateBp / 100, $languageCode)
+                )
+                : '';
             $rows .= sprintf(
-                '<tr><td>%s</td><td>%s</td><td style="text-align:right">%s</td><td style="text-align:right">%s</td><td style="text-align:right">%s</td></tr>',
+                '<tr><td>%s</td><td>%s</td><td style="text-align:right">%s</td><td style="text-align:right">%s</td>%s<td style="text-align:right">%s</td></tr>',
                 $this->escape($item->getName()),
                 $this->escape($item->getDescription()),
                 $this->escape((string)($item->getQuantity() ?? 0)),
                 $this->formatMoney($item->getUnitPriceCents(), $company, $languageCode),
+                $vatCell,
                 $this->formatMoney($item->getTotalCents(), $company, $languageCode)
             );
         }
+        $vatHeader = $showVatColumn
+            ? sprintf('<th style="text-align:right">%s</th>', $this->escape($this->t($languageCode, 'tax_short')))
+            : '';
 
-        $taxLine = $invoice->getIsSmallBusiness()
-            ? ($tax?->getSmallBusinessNote() ?: $this->t($languageCode, 'small_business'))
-            : sprintf('%s (%s%%)', $this->t($languageCode, 'tax'), $this->documentLocaleService->formatPercent(($invoice->getTaxRateBp() ?? 0) / 100, $languageCode));
-        $taxAmount = $invoice->getIsSmallBusiness() ? '' : $this->formatMoney($invoice->getTaxCents(), $company, $languageCode);
+        // Totals: single line (legacy) or one line per rate group
+        if ($invoice->getIsSmallBusiness()) {
+            $taxLinesHtml = sprintf(
+                '<p>%s</p>',
+                $this->escape($tax?->getSmallBusinessNote() ?: $this->t($languageCode, 'small_business'))
+            );
+            $displayTotal = $invoice->getTotalCents();
+        } elseif ($hasItemRates) {
+            $groups = $this->buildTaxGroups($items, $defaultRateBp);
+            $taxLinesHtml = '';
+            $computedTax = 0;
+            foreach ($groups as $rateBp => $netCents) {
+                $groupTax = (int)round($netCents * $rateBp / 10000);
+                $computedTax += $groupTax;
+                $taxLinesHtml .= sprintf(
+                    '<p>%s (%s%%): %s</p>',
+                    $this->escape($this->t($languageCode, 'tax')),
+                    $this->documentLocaleService->formatPercent($rateBp / 100, $languageCode),
+                    $this->formatMoney($groupTax, $company, $languageCode)
+                );
+            }
+            $displayTotal = (int)($invoice->getSubtotalCents() ?? 0) + $computedTax;
+        } else {
+            $taxLinesHtml = sprintf(
+                '<p>%s (%s%%): %s</p>',
+                $this->escape($this->t($languageCode, 'tax')),
+                $this->documentLocaleService->formatPercent($defaultRateBp / 100, $languageCode),
+                $this->formatMoney($invoice->getTaxCents(), $company, $languageCode)
+            );
+            $displayTotal = $invoice->getTotalCents();
+        }
 
         $footerText = $invoice->getFooterText() ?? $texts?->getFooterText() ?? '';
         $greeting = $invoice->getGreetingText() ?? $texts?->getInvoiceGreeting() ?? '';
@@ -212,17 +269,22 @@ class InvoicePdfService {
             );
         }
         $closingText = $texts?->getInvoiceClosingText() ?? '';
-        $ownerName = $company?->getOwnerName();
         $closingTextBlock = $closingText
             ? sprintf('<p>%s</p>', nl2br($this->escape($closingText)))
             : '';
-        $closingBlock = $ownerName
+        // Issue #15: greeting formula and signature name are configurable via
+        // the Texte settings; fall back to translation + company owner.
+        $greetingFormula = trim((string)($texts?->getClosingGreeting() ?? ''))
+            ?: $this->t($languageCode, 'closing_greeting');
+        $signatureName = trim((string)($texts?->getSignatureName() ?? ''))
+            ?: (string)($company?->getOwnerName() ?? '');
+        $closingBlock = $signatureName !== ''
             ? sprintf(
                 '<p>%s</p><p>&nbsp;</p><p>%s</p>',
-                $this->escape($this->t($languageCode, 'closing_greeting')),
-                $this->escape($ownerName)
+                $this->escape($greetingFormula),
+                $this->escape($signatureName)
             )
-            : sprintf('<p>%s</p>', $this->escape($this->t($languageCode, 'closing_greeting')));
+            : sprintf('<p>%s</p>', $this->escape($greetingFormula));
 
         $bankParts = [];
         if ($misc?->getBankName()) {
@@ -280,7 +342,7 @@ class InvoicePdfService {
         return sprintf(
             '<html><head><meta charset="UTF-8"><style>
                 @page { margin: 32px 32px 120px 32px; }
-                body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #1f2933; margin: 0; }
+                body { font-family: Helvetica, Arial, sans-serif; font-size: %dpx; color: #1f2933; margin: 0; }
                 .header { width: 100%%; border-collapse: collapse; }
                 .header td { vertical-align: top; padding: 0; }
                 .company { text-align: right; font-size: 13px; line-height: 1.4; }
@@ -307,7 +369,7 @@ class InvoicePdfService {
             <div class="customer">%s</div>
             <h1>%s %s</h1>
             <p><strong>%s:</strong> %s</p>
-            <p><strong>%s:</strong> %s<br><strong>%s:</strong> %s</p>
+            %s
             %s
             %s
             %s
@@ -320,6 +382,7 @@ class InvoicePdfService {
                   <th>%s</th>
                   <th style="text-align:right">%s</th>
                   <th style="text-align:right">%s</th>
+                  %s
                   <th style="text-align:right">%s</th>
                 </tr>
               </thead>
@@ -327,12 +390,13 @@ class InvoicePdfService {
             </table>
             <div class="totals">
               <p>%s: %s</p>
-              <p>%s%s</p>
+              %s
               <p><strong>%s: %s</strong></p>
             </div>
             %s
             %s
             </body></html>',
+            $bodyFontPx,
             $logoCss,
             nl2br($this->escape($footerText)),
             $bankInfo,
@@ -343,10 +407,7 @@ class InvoicePdfService {
             $this->escape($invoice->getNumber() ?? ''),
             $this->escape($this->t($languageCode, 'invoice_number')),
             $this->escape($invoice->getNumber() ?? ''),
-            $this->escape($this->t($languageCode, 'date')),
-            $issueDate,
-            $this->escape($this->t($languageCode, 'due_until')),
-            $dueDate,
+            $dateBlock,
             $offerReference,
             $servicePeriod,
             $customFieldBlock,
@@ -356,17 +417,33 @@ class InvoicePdfService {
             $this->escape($this->t($languageCode, 'description')),
             $this->escape($this->t($languageCode, 'quantity')),
             $this->escape($this->t($languageCode, 'unit_price')),
+            $vatHeader,
             $this->escape($this->t($languageCode, 'total')),
             $rows,
             $this->escape($this->t($languageCode, 'subtotal')),
             $this->formatMoney($invoice->getSubtotalCents(), $company, $languageCode),
-            $this->escape($taxLine),
-            $taxAmount ? ': ' . $taxAmount : '',
+            $taxLinesHtml,
             $this->escape($this->t($languageCode, 'total')),
-            $this->formatMoney($invoice->getTotalCents(), $company, $languageCode),
+            $this->formatMoney($displayTotal, $company, $languageCode),
             $closingTextBlock,
             $closingBlock
         );
+    }
+
+    /**
+     * Group net amounts (cents) by effective tax rate (basis points).
+     *
+     * @param InvoiceItem[] $items
+     * @return array<int, int> rateBp => summed net cents
+     */
+    private function buildTaxGroups(array $items, int $defaultRateBp): array {
+        $groups = [];
+        foreach ($items as $item) {
+            $rateBp = (int)($item->getTaxRateBp() ?? $defaultRateBp);
+            $groups[$rateBp] = ($groups[$rateBp] ?? 0) + (int)($item->getTotalCents() ?? 0);
+        }
+        krsort($groups);
+        return $groups;
     }
 
     private function normalizeInvoiceType(?string $invoiceType): string {
@@ -499,33 +576,107 @@ class InvoicePdfService {
         return [$size, $html, ''];
     }
 
-    private function buildCompanyHeader(string $size, string $logoHtml, string $companyBlock): string {
-        if ($logoHtml === '') {
-            return sprintf('<div class="company">%s</div>', $companyBlock);
+    /**
+     * Issues #18/#20: parse the per-company document layout JSON with defaults
+     * matching the pre-1.7.0 output.
+     *
+     * @return array{showVatId: bool, showTaxId: bool, showPhone: bool, showEmail: bool, companyBlockPosition: string, fontSize: string}
+     */
+    private function getDocLayout(?Company $company): array {
+        $defaults = [
+            'showVatId' => false,
+            'showTaxId' => false,
+            'showPhone' => false,
+            'showEmail' => true,
+            'companyBlockPosition' => 'right',
+            'fontSize' => 'normal',
+        ];
+        $raw = trim((string)($company?->getDocLayout() ?? ''));
+        if ($raw === '') {
+            return $defaults;
         }
-        return match ($size) {
-            'large' => sprintf(
-                '<div class="logo-banner">%s</div><div class="company">%s</div>',
-                $logoHtml,
-                $companyBlock
-            ),
-            'small' => sprintf(
-                '<table class="header"><tr>'
-                . '<td style="width:55%%; text-align:left">%s</td>'
-                . '<td class="company" style="width:45%%">%s</td>'
-                . '</tr></table>',
-                $logoHtml,
-                $companyBlock
-            ),
-            default => sprintf(
-                '<table class="header"><tr>'
-                . '<td style="width:45%%; text-align:left">%s</td>'
-                . '<td class="company" style="width:55%%">%s</td>'
-                . '</tr></table>',
-                $logoHtml,
-                $companyBlock
-            ),
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return $defaults;
+        }
+        $layout = array_merge($defaults, array_intersect_key($decoded, $defaults));
+        $layout['companyBlockPosition'] = in_array($layout['companyBlockPosition'], ['left', 'right'], true)
+            ? $layout['companyBlockPosition'] : 'right';
+        $layout['fontSize'] = in_array($layout['fontSize'], ['small', 'normal', 'large'], true)
+            ? $layout['fontSize'] : 'normal';
+        foreach (['showVatId', 'showTaxId', 'showPhone', 'showEmail'] as $flag) {
+            $layout[$flag] = (bool)$layout[$flag];
+        }
+        return $layout;
+    }
+
+    private function resolveFontSize(array $layout): int {
+        return match ($layout['fontSize']) {
+            'small' => 11,
+            'large' => 13,
+            default => 12,
         };
+    }
+
+    private function buildCompanyBlock(?Company $company, array $layout): string {
+        if ($company === null) {
+            return '';
+        }
+        $lines = [
+            $this->escape($company->getName()),
+            trim($this->escape($company->getStreet()) . ' ' . $this->escape($company->getHouseNumber())),
+            trim($this->escape($company->getZip()) . ' ' . $this->escape($company->getCity())),
+        ];
+        if ($layout['showEmail'] && $company->getEmail()) {
+            $lines[] = $this->escape($company->getEmail());
+        }
+        if ($layout['showPhone'] && $company->getPhone()) {
+            $lines[] = $this->escape($company->getPhone());
+        }
+        if ($layout['showVatId'] && $company->getVatId()) {
+            $lines[] = 'USt-IdNr.: ' . $this->escape($company->getVatId());
+        }
+        if ($layout['showTaxId'] && $company->getTaxId()) {
+            $lines[] = 'St.-Nr.: ' . $this->escape($company->getTaxId());
+        }
+        return implode('<br>', array_filter($lines, static fn(string $line): bool => $line !== ''));
+    }
+
+    private function buildCompanyHeader(string $size, string $logoHtml, string $companyBlock, array $layout = []): string {
+        $position = $layout['companyBlockPosition'] ?? 'right';
+        $align = $position === 'left' ? 'left' : 'right';
+        $companyDiv = sprintf('<div class="company" style="text-align:%s">%s</div>', $align, $companyBlock);
+        if ($logoHtml === '') {
+            return $companyDiv;
+        }
+        if ($size === 'large') {
+            return sprintf('<div class="logo-banner">%s</div>%s', $logoHtml, $companyDiv);
+        }
+        $logoWidth = $size === 'small' ? 55 : 45;
+        $companyWidth = 100 - $logoWidth;
+        // company block left → logo moves to the right column
+        if ($position === 'left') {
+            return sprintf(
+                '<table class="header"><tr>'
+                . '<td class="company" style="width:%d%%; text-align:left">%s</td>'
+                . '<td style="width:%d%%; text-align:right">%s</td>'
+                . '</tr></table>',
+                $companyWidth,
+                $companyBlock,
+                $logoWidth,
+                $logoHtml
+            );
+        }
+        return sprintf(
+            '<table class="header"><tr>'
+            . '<td style="width:%d%%; text-align:left">%s</td>'
+            . '<td class="company" style="width:%d%%; text-align:right">%s</td>'
+            . '</tr></table>',
+            $logoWidth,
+            $logoHtml,
+            $companyWidth,
+            $companyBlock
+        );
     }
 
     private function normalizeLogoSize(?string $value): string {

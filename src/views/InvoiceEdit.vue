@@ -195,6 +195,7 @@
               <th>{{ t('description') }}</th>
               <th class="col-qty">{{ t('quantity') }}</th>
               <th class="price">{{ t('unitPrice') }}</th>
+              <th v-if="!form.isSmallBusiness" class="col-vat">{{ t('itemVat') }}</th>
               <th class="price">{{ t('total') }}</th>
               <th class="actions">{{ t('action') }}</th>
             </tr>
@@ -261,6 +262,14 @@
                   :value.sync="item.unitPrice"
                 />
               </td>
+              <td v-if="!form.isSmallBusiness" class="col-vat">
+                <NcTextField
+                  :label="t('itemVat')"
+                  type="text"
+                  :placeholder="t('itemVatPlaceholder')"
+                  :value.sync="item.taxRatePercent"
+                />
+              </td>
               <td class="price">{{ formatPrice(itemTotalCents(item)) }}</td>
               <td class="actions">
                 <NcButton
@@ -303,6 +312,11 @@
           <p v-if="form.isSmallBusiness">
             {{ smallBusinessNote }}
           </p>
+          <template v-else-if="hasItemRates">
+            <p v-for="[rateBp, netCents] in itemRateGroups" :key="`rate-${rateBp}`">
+              {{ t('tax') }} ({{ formatTaxRate(rateBp) }}): {{ formatPrice(Math.round((netCents * rateBp) / 10000)) }}
+            </p>
+          </template>
           <p v-else>
             {{ t('tax') }} ({{ formatTaxRate(resolvedTaxRateBp) }}): {{ formatPrice(taxCents) }}
           </p>
@@ -453,6 +467,8 @@ const createEmptyItem = () => ({
   description: '',
   quantity: 1,
   unitPrice: '',
+  // empty = inherit the invoice-level VAT rate (issue #24)
+  taxRatePercent: '',
 })
 
 const parseBool = (value) => {
@@ -584,9 +600,30 @@ export default {
       }
       return percentToBasisPoints(this.form.taxRatePercent) ?? Number(this.form.taxRateBp || 0)
     },
+    itemRateGroups() {
+      // Issue #24: net amounts grouped by effective VAT rate (bp)
+      const groups = new Map()
+      for (const item of this.form.items) {
+        const own = (item.taxRatePercent || '').trim()
+        const rate = own !== ''
+          ? (percentToBasisPoints(own) ?? this.resolvedTaxRateBp)
+          : this.resolvedTaxRateBp
+        groups.set(rate, (groups.get(rate) || 0) + this.itemTotalCents(item))
+      }
+      return [...groups.entries()].sort((a, b) => b[0] - a[0])
+    },
+    hasItemRates() {
+      return this.form.items.some((item) => (item.taxRatePercent || '').trim() !== '')
+    },
     taxCents() {
       if (this.form.isSmallBusiness) {
         return 0
+      }
+      if (this.hasItemRates) {
+        return this.itemRateGroups.reduce(
+          (sum, [rateBp, netCents]) => sum + Math.round((netCents * rateBp) / 10000),
+          0
+        )
       }
       const rate = this.resolvedTaxRateBp
       return Math.round((this.subtotalCents * rate) / 10000)
@@ -721,6 +758,9 @@ export default {
           description: item.description || '',
           quantity: item.quantity || 1,
           unitPrice: inputFromCents(item.unitPriceCents),
+          taxRatePercent: item.taxRateBp !== null && item.taxRateBp !== undefined
+            ? percentFromBasisPoints(item.taxRateBp)
+            : '',
         }))
 
         this.form = {
@@ -958,6 +998,10 @@ export default {
               return null
             }
 
+            const itemRateBp = (item.taxRatePercent || '').trim() !== ''
+              ? percentToBasisPoints(item.taxRatePercent)
+              : null
+
             return {
               productId: item.positionType === 'product' ? item.productId : null,
               positionType: item.positionType,
@@ -966,6 +1010,7 @@ export default {
               quantity,
               unitPriceCents,
               totalCents: this.itemTotalCents(item),
+              taxRateBp: itemRateBp,
             }
           })
           .filter(Boolean)

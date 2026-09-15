@@ -18,6 +18,8 @@ class Texts extends Entity {
     public $offerEmailBody;
     public $invoiceEmailSubject;
     public $invoiceEmailBody;
+    public $closingGreeting;
+    public $signatureName;
 
     public function __construct() {
         $this->addType('companyId', 'integer');
@@ -30,5 +32,7 @@ class Texts extends Entity {
         $this->addType('offerEmailBody', 'text');
         $this->addType('invoiceEmailSubject', 'text');
         $this->addType('invoiceEmailBody', 'text');
+        $this->addType('closingGreeting', 'string');
+        $this->addType('signatureName', 'string');
     }
 }

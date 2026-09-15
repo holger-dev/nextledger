@@ -51,6 +51,11 @@ Kleinunternehmerregelung und Standard-USt.
 - **Offers & Invoices** with positions, tax logic, and PDF export
 - **Per‑Company logo** with three PDF layout sizes (1.6.3)
 - **ZUGFeRD EN16931 e‑invoicing** as PDF/A‑3 with embedded CII‑XML, switchable per company (1.6.3)
+- **Per‑position VAT rates** (19/7/0 %) with grouped tax totals in PDF and ZUGFeRD (1.7.0)
+- **Custom invoice number schemes** per company, e.g. `RE-{YYYY}-{SEQ4}` (1.7.0)
+- **Receipts on expenses** stored in Nextcloud Files, plus **recurring expenses** via background job (1.7.0)
+- **Document layout settings** per company: header fields, company-block position, font size (1.7.0)
+- **Editable email preview** before sending an invoice (1.7.0)
 - **Optional PDF auto-storage** to Nextcloud Files with overwrite or versioning
 - **Numbering** `YYYYMMDD-####` for offers and invoices
 - **Mail‑to workflow** for offers/invoices (auto‑download PDF + template mail)

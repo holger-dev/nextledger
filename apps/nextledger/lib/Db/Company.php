@@ -28,6 +28,8 @@ class Company extends Entity {
     public $invoiceFormat;
     public $countryCode;
     public $mailAttachment;
+    public $numberScheme;
+    public $docLayout;
 
     public function __construct() {
         $this->addType('name', 'string');
@@ -50,5 +52,7 @@ class Company extends Entity {
         $this->addType('invoiceFormat', 'string');
         $this->addType('countryCode', 'string');
         $this->addType('mailAttachment', 'string');
+        $this->addType('numberScheme', 'string');
+        $this->addType('docLayout', 'string');
     }
 }

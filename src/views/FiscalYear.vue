@@ -340,6 +340,56 @@
           <div class="form-group">
             <NcTextArea :label="t('description')" :value.sync="expenseForm.description" />
           </div>
+          <div class="form-group">
+            <NcSelect
+              :value="expenseForm.recurringInterval"
+              :options="recurringIntervalOptions"
+              :reduce="(option) => option.value"
+              :append-to-body="false"
+              :clearable="false"
+              :input-label="t('recurringInterval')"
+              :label-outside="true"
+              @input="expenseForm.recurringInterval = $event"
+            />
+            <p class="hint">{{ t('recurringHint') }}</p>
+          </div>
+          <div v-if="expenseForm.recurringInterval !== 'none'" class="form-group">
+            <NcDateTimePickerNative
+              :label="t('recurringUntil')"
+              type="date"
+              id="fiscal-year-expense-recurring-until"
+              :value="expenseForm.recurringUntil"
+              @input="expenseForm.recurringUntil = $event"
+            />
+          </div>
+          <div v-if="editingExpenseId" class="form-group">
+            <p class="label">{{ t('receipt') }}</p>
+            <p v-if="expenseForm.attachmentPath" class="hint">
+              {{ t('receiptStored') }}: {{ expenseForm.attachmentPath }}
+            </p>
+            <div class="attachment-actions">
+              <input
+                ref="receiptInput"
+                type="file"
+                accept="application/pdf,image/png,image/jpeg,image/gif,image/webp,image/heic"
+                class="receipt-input"
+                @change="onReceiptFileChange"
+              />
+              <NcButton type="secondary" :disabled="uploadingReceipt" @click="$refs.receiptInput.click()">
+                {{ expenseForm.attachmentPath ? t('receiptReplace') : t('receiptUpload') }}
+              </NcButton>
+              <NcButton
+                v-if="expenseForm.attachmentPath"
+                type="tertiary"
+                :disabled="uploadingReceipt"
+                @click="removeReceipt"
+              >
+                {{ t('receiptRemove') }}
+              </NcButton>
+            </div>
+            <p class="hint">{{ t('receiptHint') }}</p>
+          </div>
+          <p v-else class="hint">{{ t('receiptAfterSaveHint') }}</p>
         </div>
         <div class="actions">
           <NcButton type="primary" :disabled="savingExpense || !canSaveExpense" @click="saveExpense">
@@ -418,6 +468,7 @@ import {
 } from '@nextcloud/vue'
 import NcTextArea from '@nextcloud/vue/dist/Components/NcTextArea.mjs'
 import NcDateTimePickerNative from '@nextcloud/vue/dist/Components/NcDateTimePickerNative.mjs'
+import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import CheckCircleOutline from 'vue-material-design-icons/CheckCircleOutline.vue'
 import FileDocumentOutline from 'vue-material-design-icons/FileDocumentOutline.vue'
@@ -431,7 +482,14 @@ import {
   updateFiscalYear,
 } from '../api/fiscalYears'
 import { createIncome, deleteIncome, getIncomes, updateIncome } from '../api/incomes'
-import { createExpense, deleteExpense, getExpenses, updateExpense } from '../api/expenses'
+import {
+  createExpense,
+  deleteExpense,
+  deleteExpenseAttachment,
+  getExpenses,
+  updateExpense,
+  uploadExpenseAttachment,
+} from '../api/expenses'
 import { getInvoice, updateInvoice } from '../api/invoices'
 
 const toTimestamp = (value) => {
@@ -519,6 +577,7 @@ export default {
     NcLoadingIcon,
     NcModal,
     NcDateTimePickerNative,
+    NcSelect,
     NcTextArea,
     NcTextField,
     CheckCircleOutline,
@@ -561,7 +620,11 @@ export default {
         description: '',
         bookedAt: null,
         amount: '',
+        recurringInterval: 'none',
+        recurringUntil: null,
+        attachmentPath: '',
       },
+      uploadingReceipt: false,
       expenseFieldErrors: {},
       incomeForm: {
         name: '',
@@ -573,6 +636,14 @@ export default {
     }
   },
   computed: {
+    recurringIntervalOptions() {
+      return [
+        { value: 'none', label: this.t('recurringNone') },
+        { value: 'monthly', label: this.t('recurringMonthly') },
+        { value: 'quarterly', label: this.t('recurringQuarterly') },
+        { value: 'yearly', label: this.t('recurringYearly') },
+      ]
+    },
     canSave() {
       return (
         this.form.name.trim() !== '' &&
@@ -729,6 +800,9 @@ export default {
         description: '',
         bookedAt: todayDate(),
         amount: '',
+        recurringInterval: 'none',
+        recurringUntil: null,
+        attachmentPath: '',
       }
       this.expenseFieldErrors = {}
       this.expenseError = ''
@@ -755,6 +829,9 @@ export default {
         description: '',
         bookedAt: null,
         amount: '',
+        recurringInterval: 'none',
+        recurringUntil: null,
+        attachmentPath: '',
       }
       this.expenseFieldErrors = {}
       this.expenseError = ''
@@ -779,6 +856,9 @@ export default {
         description: expense.description || '',
         bookedAt: toDateFromTimestamp(expense.bookedAt),
         amount: inputFromCents(expense.amountCents),
+        recurringInterval: expense.recurringInterval || 'none',
+        recurringUntil: toDateFromTimestamp(expense.recurringUntil),
+        attachmentPath: expense.attachmentPath || '',
       }
       this.expenseFieldErrors = {}
       this.expenseError = ''
@@ -838,6 +918,10 @@ export default {
         description: this.expenseForm.description.trim(),
         bookedAt,
         amountCents: Math.round(amount * 100),
+        recurringInterval: this.expenseForm.recurringInterval || 'none',
+        recurringUntil: this.expenseForm.recurringInterval !== 'none'
+          ? toTimestamp(this.expenseForm.recurringUntil)
+          : null,
       }
 
       try {
@@ -859,6 +943,46 @@ export default {
         this.expenseError = this.t('saveExpenseError')
       } finally {
         this.savingExpense = false
+      }
+    },
+    async onReceiptFileChange(event) {
+      const file = event?.target?.files?.[0]
+      if (!file || !this.editingExpenseId) {
+        return
+      }
+      this.uploadingReceipt = true
+      this.expenseError = ''
+      try {
+        const saved = await uploadExpenseAttachment(this.editingExpenseId, file)
+        this.expenseForm.attachmentPath = saved.attachmentPath || ''
+        this.expenses = this.expenses.map((item) =>
+          item.id === this.editingExpenseId ? saved : item
+        )
+      } catch (e) {
+        this.expenseError = this.t('receiptUploadError')
+      } finally {
+        this.uploadingReceipt = false
+        if (this.$refs.receiptInput) {
+          this.$refs.receiptInput.value = ''
+        }
+      }
+    },
+    async removeReceipt() {
+      if (!this.editingExpenseId) {
+        return
+      }
+      this.uploadingReceipt = true
+      this.expenseError = ''
+      try {
+        const saved = await deleteExpenseAttachment(this.editingExpenseId)
+        this.expenseForm.attachmentPath = ''
+        this.expenses = this.expenses.map((item) =>
+          item.id === this.editingExpenseId ? saved : item
+        )
+      } catch (e) {
+        this.expenseError = this.t('receiptUploadError')
+      } finally {
+        this.uploadingReceipt = false
       }
     },
     async saveIncome() {

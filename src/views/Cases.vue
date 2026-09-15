@@ -2107,6 +2107,11 @@ export default {
 
 .table td.description {
   color: var(--color-text-lighter, #6b7280);
+  /* Issue #22: long correspondence notes must wrap instead of stretching the row */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 420px;
 }
 
 .attachment-actions {

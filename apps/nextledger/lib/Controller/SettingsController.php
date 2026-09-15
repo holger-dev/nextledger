@@ -134,6 +134,8 @@ class SettingsController extends ApiController {
         ?string $invoiceFormat = null,
         ?string $logoSize = null,
         ?string $mailAttachment = null,
+        ?string $numberScheme = null,
+        ?string $docLayout = null,
     ): JSONResponse {
         $company = new Company();
         $company->setName($name ?: 'Neue Firma');
@@ -154,6 +156,8 @@ class SettingsController extends ApiController {
         $company->setInvoiceFormat($this->normalizeInvoiceFormat($invoiceFormat));
         $company->setLogoSize($this->normalizeLogoSize($logoSize));
         $company->setMailAttachment($this->normalizeMailAttachment($mailAttachment));
+        $company->setNumberScheme($this->normalizeNumberScheme($numberScheme));
+        $company->setDocLayout($this->normalizeDocLayout($docLayout));
 
         /** @var Company $saved */
         $saved = $this->companyMapper->insert($company);
@@ -252,6 +256,8 @@ class SettingsController extends ApiController {
         ?string $invoiceFormat = null,
         ?string $logoSize = null,
         ?string $mailAttachment = null,
+        ?string $numberScheme = null,
+        ?string $docLayout = null,
     ): JSONResponse {
         $company = $this->activeCompanyService->getActiveCompany();
         $company->setName($name);
@@ -271,6 +277,8 @@ class SettingsController extends ApiController {
         $company->setInvoiceFormat($this->normalizeInvoiceFormat($invoiceFormat));
         $company->setLogoSize($this->normalizeLogoSize($logoSize));
         $company->setMailAttachment($this->normalizeMailAttachment($mailAttachment));
+        $company->setNumberScheme($this->normalizeNumberScheme($numberScheme));
+        $company->setDocLayout($this->normalizeDocLayout($docLayout));
         /** @var Company $saved */
         $saved = $this->companyMapper->update($company);
         if (is_array($sharedUserIds)) {
@@ -385,6 +393,8 @@ class SettingsController extends ApiController {
         ?string $offerEmailBody = null,
         ?string $invoiceEmailSubject = null,
         ?string $invoiceEmailBody = null,
+        ?string $closingGreeting = null,
+        ?string $signatureName = null,
     ): JSONResponse {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         /** @var Texts $texts */
@@ -399,6 +409,8 @@ class SettingsController extends ApiController {
         $texts->setOfferEmailBody($offerEmailBody);
         $texts->setInvoiceEmailSubject($invoiceEmailSubject);
         $texts->setInvoiceEmailBody($invoiceEmailBody);
+        $texts->setClosingGreeting($closingGreeting);
+        $texts->setSignatureName($signatureName);
         $saved = $this->persistScopedSingleton($this->textsMapper, $texts);
 
         return new JSONResponse($saved);
@@ -685,6 +697,37 @@ class SettingsController extends ApiController {
         $allowed = ['pdf', 'xml', 'both'];
         $normalized = strtolower(trim((string)($value ?? '')));
         return in_array($normalized, $allowed, true) ? $normalized : 'pdf';
+    }
+
+    private function normalizeNumberScheme(?string $value): ?string {
+        $scheme = trim((string)($value ?? ''));
+        if ($scheme === '') {
+            return null;
+        }
+        // must contain exactly one sequence placeholder and stay within limits;
+        // otherwise fall back to the legacy scheme (null)
+        if (strlen($scheme) > 64 || preg_match_all('/\{SEQ[3-6]?\}/', $scheme) !== 1) {
+            return null;
+        }
+        return $scheme;
+    }
+
+    private function normalizeDocLayout(?string $value): ?string {
+        $raw = trim((string)($value ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        // whitelist known keys so arbitrary payloads never reach the DB
+        $allowedKeys = [
+            'showVatId', 'showTaxId', 'showPhone', 'showEmail',
+            'companyBlockPosition', 'fontSize',
+        ];
+        $clean = array_intersect_key($decoded, array_flip($allowedKeys));
+        return $clean === [] ? null : json_encode($clean);
     }
 
     private function normalizeCountryCode(?string $value): string {

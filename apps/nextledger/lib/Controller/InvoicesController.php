@@ -524,21 +524,26 @@ class InvoicesController extends ApiController {
             $message->setReplyTo([$emails['replyToEmail']]);
         }
 
-        $tempPaths = [];
-        try {
-            foreach ($attachments as $att) {
-                $tempPaths[] = $this->writeTempAttachment($att['filename'], $att['content']);
-            }
-            foreach ($tempPaths as $i => $path) {
-                $attachment = $this->mailer->createAttachmentFromPath($path);
-                $message->attach($attachment);
-            }
-            $this->mailer->send($message);
-        } finally {
-            foreach ($tempPaths as $path) {
-                @unlink($path);
-            }
+        // Attach from memory with an explicit, clean filename and MIME type.
+        // (Attaching via temp-file path leaked the uniqid()-based temp name —
+        // including its embedded dot — as the attachment filename, which some
+        // mail gateways reject as a blocked file type, e.g. SMTP 554 5.7.1.)
+        foreach ($attachments as $att) {
+            $attachment = $this->mailer->createAttachment(
+                $att['content'],
+                $this->sanitizeAttachmentFilename($att['filename']),
+                $att['mime']
+            );
+            $message->attach($attachment);
         }
+        $this->mailer->send($message);
+    }
+
+    private function sanitizeAttachmentFilename(string $filename): string {
+        $clean = preg_replace('/[^a-zA-Z0-9._-]+/', '_', trim($filename)) ?: 'attachment';
+        // collapse consecutive dots so gateways never see a double extension
+        $clean = preg_replace('/\.{2,}/', '.', $clean) ?: 'attachment';
+        return trim($clean, '._-') ?: 'attachment';
     }
 
     /**
@@ -586,18 +591,11 @@ class InvoicesController extends ApiController {
         }
 
         $providerAttachments = array_map(
-            static fn(array $a) => new Attachment($a['content'], $a['filename'], $a['mime']),
+            fn(array $a) => new Attachment($a['content'], $this->sanitizeAttachmentFilename($a['filename']), $a['mime']),
             $attachments
         );
         $message->setAttachments(...$providerAttachments);
         $service->sendMessage($message);
-    }
-
-    private function writeTempAttachment(string $filename, string $content): string {
-        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename) ?: 'attachment.pdf';
-        $tmpPath = sys_get_temp_dir() . '/' . uniqid('nextledger-', true) . '-' . $safeName;
-        file_put_contents($tmpPath, $content);
-        return $tmpPath;
     }
 
     private function entityToArray(object $entity): array {

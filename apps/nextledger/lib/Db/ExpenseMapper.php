@@ -31,4 +31,21 @@ class ExpenseMapper extends BaseMapper {
 
         return $this->findEntities($qb);
     }
+
+    /**
+     * All expenses with an active recurrence, across all companies.
+     * Used by the background job (issue #23).
+     *
+     * @return Expense[]
+     */
+    public function findRecurringTemplates(): array {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->tableName)
+            ->where($qb->expr()->isNotNull('recurring_interval'))
+            ->andWhere($qb->expr()->neq('recurring_interval', $qb->createNamedParameter('none')))
+            ->andWhere($qb->expr()->isNull('recurring_parent_id'));
+
+        return $this->findEntities($qb);
+    }
 }

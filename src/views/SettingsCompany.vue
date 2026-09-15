@@ -158,6 +158,44 @@
       />
       <p class="hint">{{ t('mailAttachmentHint') }}</p>
 
+      <NcTextField :label="t('numberScheme')" :value.sync="form.numberScheme" :placeholder="t('numberSchemePlaceholder')" />
+      <p class="hint">{{ t('numberSchemeHint') }}</p>
+
+      <h2>{{ t('docLayoutSection') }}</h2>
+      <p class="hint">{{ t('docLayoutHint') }}</p>
+      <NcCheckboxRadioSwitch type="switch" :checked.sync="layoutForm.showEmail">
+        {{ t('docLayoutShowEmail') }}
+      </NcCheckboxRadioSwitch>
+      <NcCheckboxRadioSwitch type="switch" :checked.sync="layoutForm.showPhone">
+        {{ t('docLayoutShowPhone') }}
+      </NcCheckboxRadioSwitch>
+      <NcCheckboxRadioSwitch type="switch" :checked.sync="layoutForm.showVatId">
+        {{ t('docLayoutShowVatId') }}
+      </NcCheckboxRadioSwitch>
+      <NcCheckboxRadioSwitch type="switch" :checked.sync="layoutForm.showTaxId">
+        {{ t('docLayoutShowTaxId') }}
+      </NcCheckboxRadioSwitch>
+      <NcSelect
+        :value="layoutForm.companyBlockPosition"
+        :options="companyBlockPositionOptions"
+        :reduce="(option) => option.value"
+        :append-to-body="false"
+        :clearable="false"
+        :input-label="t('docLayoutCompanyPosition')"
+        :label-outside="true"
+        @input="layoutForm.companyBlockPosition = $event"
+      />
+      <NcSelect
+        :value="layoutForm.fontSize"
+        :options="fontSizeOptions"
+        :reduce="(option) => option.value"
+        :append-to-body="false"
+        :clearable="false"
+        :input-label="t('docLayoutFontSize')"
+        :label-outside="true"
+        @input="layoutForm.fontSize = $event"
+      />
+
       <div v-if="canManageUsers" class="share-box">
         <NcSelect
           :value="selectedSharedUserId"
@@ -202,7 +240,7 @@
 </template>
 
 <script>
-import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
+import { NcButton, NcCheckboxRadioSwitch, NcLoadingIcon } from '@nextcloud/vue'
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
 import {
@@ -221,6 +259,7 @@ export default {
   name: 'SettingsCompany',
   components: {
     NcButton,
+    NcCheckboxRadioSwitch,
     NcLoadingIcon,
     NcSelect,
     NcTextField,
@@ -242,6 +281,14 @@ export default {
       selectedSharedUserId: '',
       hasLogo: false,
       logoDataUri: '',
+      layoutForm: {
+        showEmail: true,
+        showPhone: false,
+        showVatId: false,
+        showTaxId: false,
+        companyBlockPosition: 'right',
+        fontSize: 'normal',
+      },
       uploadingLogo: false,
       logoStatus: '',
       form: {
@@ -262,6 +309,8 @@ export default {
         invoiceFormat: 'pdf',
         logoSize: 'medium',
         mailAttachment: 'pdf',
+        numberScheme: '',
+        docLayout: null,
       },
     }
   },
@@ -314,6 +363,19 @@ export default {
         { value: 'both', label: this.t('mailAttachmentBoth') },
       ]
     },
+    companyBlockPositionOptions() {
+      return [
+        { value: 'right', label: this.t('docLayoutPositionRight') },
+        { value: 'left', label: this.t('docLayoutPositionLeft') },
+      ]
+    },
+    fontSizeOptions() {
+      return [
+        { value: 'small', label: this.t('docLayoutFontSmall') },
+        { value: 'normal', label: this.t('docLayoutFontNormal') },
+        { value: 'large', label: this.t('docLayoutFontLarge') },
+      ]
+    },
     sharedUserOptions() {
       return this.availableUsers
         .filter((entry) => !this.sharedUserIds.includes(entry.userId))
@@ -357,6 +419,22 @@ export default {
         invoiceFormat: safeString(data.invoiceFormat || 'pdf'),
         logoSize: safeString(data.logoSize || 'medium'),
         mailAttachment: safeString(data.mailAttachment || 'pdf'),
+        numberScheme: safeString(data.numberScheme),
+        docLayout: data.docLayout || null,
+      }
+      let parsedLayout = {}
+      try {
+        parsedLayout = data.docLayout ? JSON.parse(data.docLayout) : {}
+      } catch (e) {
+        parsedLayout = {}
+      }
+      this.layoutForm = {
+        showEmail: parsedLayout.showEmail !== undefined ? !!parsedLayout.showEmail : true,
+        showPhone: !!parsedLayout.showPhone,
+        showVatId: !!parsedLayout.showVatId,
+        showTaxId: !!parsedLayout.showTaxId,
+        companyBlockPosition: parsedLayout.companyBlockPosition === 'left' ? 'left' : 'right',
+        fontSize: ['small', 'large'].includes(parsedLayout.fontSize) ? parsedLayout.fontSize : 'normal',
       }
       this.canManageUsers = Boolean(data.canManageUsers)
       this.availableUsers = Array.isArray(data.availableUsers) ? data.availableUsers : []
@@ -507,6 +585,7 @@ export default {
       try {
         const payload = {
           ...this.form,
+          docLayout: JSON.stringify(this.layoutForm),
         }
         if (this.canManageUsers) {
           payload.sharedUserIds = this.sharedUserIds

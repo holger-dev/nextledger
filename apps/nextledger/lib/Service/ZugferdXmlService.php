@@ -41,7 +41,9 @@ class ZugferdXmlService {
         Company $company,
         ?MiscSetting $misc,
     ): string {
-        return $this->createDocumentBuilder($invoice, $items, $customer, $company, $misc)->getContent();
+        return $this->withDefaultEntityLoader(
+            fn(): string => $this->createDocumentBuilder($invoice, $items, $customer, $company, $misc)->getContent()
+        );
     }
 
     /**
@@ -136,35 +138,69 @@ class ZugferdXmlService {
             );
         }
 
-        // ---- Positions
-        $taxRatePercent = $this->taxRatePercent($invoice);
+        // ---- Positions (issue #24: per-position VAT rates)
         // Use literal codes from EN16931 / UNTDID 5305 — they are stable across
         // horstoeko/zugferd releases (the constant names have been renamed once).
-        $vatCategory = $invoice->getIsSmallBusiness() ? 'E' : 'S';
+        $defaultRateBp = $invoice->getIsSmallBusiness() ? 0 : (int)($invoice->getTaxRateBp() ?? 0);
+        $hasItemRates = false;
         $line = 1;
         foreach ($items as $item) {
+            $itemRateBp = $invoice->getIsSmallBusiness()
+                ? 0
+                : (int)($item->getTaxRateBp() ?? $defaultRateBp);
+            if ($item->getTaxRateBp() !== null) {
+                $hasItemRates = true;
+            }
+            $itemCategory = $invoice->getIsSmallBusiness() ? 'E' : ($itemRateBp > 0 ? 'S' : 'Z');
             $document
                 ->addNewPosition((string)$line)
                 ->setDocumentPositionProductDetails((string)($item->getName() ?: 'Position'), (string)($item->getDescription() ?? ''))
                 ->setDocumentPositionGrossPrice($this->cents($item->getUnitPriceCents()))
                 ->setDocumentPositionNetPrice($this->cents($item->getUnitPriceCents()))
                 ->setDocumentPositionQuantity((float)($item->getQuantity() ?? 0), ZugferdUnitCodes::REC20_PIECE)
-                ->addDocumentPositionTax($vatCategory, 'VAT', $taxRatePercent)
+                ->addDocumentPositionTax($itemCategory, 'VAT', round($itemRateBp / 100, 2))
                 ->setDocumentPositionLineSummation($this->cents($item->getTotalCents()));
             $line++;
         }
 
-        // ---- Tax + totals
+        // ---- Tax + totals: one BG-23 group per distinct rate
         $subtotal = $this->cents($invoice->getSubtotalCents());
-        $taxAmount = $this->cents($invoice->getTaxCents());
-        $total = $this->cents($invoice->getTotalCents());
-        $document->addDocumentTax(
-            $vatCategory,
-            'VAT',
-            $subtotal,
-            $taxAmount,
-            $taxRatePercent
-        );
+        if ($invoice->getIsSmallBusiness()) {
+            $document->addDocumentTax('E', 'VAT', $subtotal, 0.0, 0.0);
+            $taxAmount = 0.0;
+        } elseif ($hasItemRates) {
+            $groups = [];
+            foreach ($items as $item) {
+                $rateBp = (int)($item->getTaxRateBp() ?? $defaultRateBp);
+                $groups[$rateBp] = ($groups[$rateBp] ?? 0) + (int)($item->getTotalCents() ?? 0);
+            }
+            krsort($groups);
+            $taxAmount = 0.0;
+            foreach ($groups as $rateBp => $netCents) {
+                $groupNet = round($netCents / 100, 2);
+                $groupTax = round($netCents * $rateBp / 10000) / 100;
+                $taxAmount += $groupTax;
+                $document->addDocumentTax(
+                    $rateBp > 0 ? 'S' : 'Z',
+                    'VAT',
+                    $groupNet,
+                    $groupTax,
+                    round($rateBp / 100, 2)
+                );
+            }
+            $taxAmount = round($taxAmount, 2);
+        } else {
+            $taxAmount = $this->cents($invoice->getTaxCents());
+            $document->addDocumentTax(
+                $defaultRateBp > 0 ? 'S' : 'Z',
+                'VAT',
+                $subtotal,
+                $taxAmount,
+                round($defaultRateBp / 100, 2)
+            );
+        }
+
+        $total = round($subtotal + $taxAmount, 2);
         $document->setDocumentSummation(
             $total,
             $total,
@@ -200,15 +236,43 @@ class ZugferdXmlService {
             );
         }
 
-        $this->ensureXmpReadable();
-        $document = $this->createDocumentBuilder($invoice, $items, $customer, $company, $misc);
-        $pdfBuilder = new ZugferdDocumentPdfBuilder($document, $sourcePdf);
-        $pdfBuilder->generateDocument();
-        $output = $pdfBuilder->downloadString();
-        if (!is_string($output) || $output === '') {
-            throw new RuntimeException('PDF/A-3 Erzeugung lieferte leeres Ergebnis.');
+        return $this->withDefaultEntityLoader(function () use ($sourcePdf, $invoice, $items, $customer, $company, $misc): string {
+            $this->ensureXmpReadable();
+            $document = $this->createDocumentBuilder($invoice, $items, $customer, $company, $misc);
+            $pdfBuilder = new ZugferdDocumentPdfBuilder($document, $sourcePdf);
+            $pdfBuilder->generateDocument();
+            $output = $pdfBuilder->downloadString();
+            if (!is_string($output) || $output === '') {
+                throw new RuntimeException('PDF/A-3 Erzeugung lieferte leeres Ergebnis.');
+            }
+            return $output;
+        });
+    }
+
+    /**
+     * Nextcloud installs a libxml external entity loader that always returns null
+     * (XXE hardening). horstoeko/zugferd loads its own local XMP/XSD assets via
+     * simplexml_load_file(), which that loader silently breaks:
+     * "Failed to load external entity because the resolver function returned null".
+     *
+     * We temporarily restore libxml's default loader for the duration of the
+     * ZUGFeRD calls and always reinstate a null-returning loader afterwards.
+     * Only local vendor assets are loaded in this window; no user-controlled XML
+     * is parsed here, so the XXE surface stays closed.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    private function withDefaultEntityLoader(callable $callback) {
+        // Restore libxml's built-in resolver (passing null resets to default).
+        libxml_set_external_entity_loader(null);
+        try {
+            return $callback();
+        } finally {
+            // Re-arm Nextcloud's hardening: block all external entity loading again.
+            libxml_set_external_entity_loader(static fn() => null);
         }
-        return $output;
     }
 
     private function date(?int $timestamp): \DateTime {

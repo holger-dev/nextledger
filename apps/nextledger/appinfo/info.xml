@@ -8,7 +8,7 @@
     NextLedger provides bookkeeping, customer management, invoicing, offers,
     and annual profit/loss reports inside Nextcloud.
   </description>
-  <version>1.6.3</version>
+  <version>1.7.0</version>
   <namespace>NextLedger</namespace>
   <author mail="holger@heidkamp.dev">NextLedger</author>
   <licence>AGPL-3.0-or-later</licence>
@@ -17,6 +17,9 @@
   <bugs>https://github.com/holger-dev/nextledger/issues</bugs>
   <repository type="git">https://github.com/holger-dev/nextledger.git</repository>
   <documentation>https://github.com/holger-dev/nextledger#readme</documentation>
+  <background-jobs>
+    <job>OCA\NextLedger\BackgroundJob\RecurringExpensesJob</job>
+  </background-jobs>
   <navigations>
     <navigation>
       <name>NextLedger</name>
@@ -25,6 +28,6 @@
     </navigation>
   </navigations>
   <dependencies>
-    <nextcloud min-version="30" max-version="32"/>
+    <nextcloud min-version="30" max-version="33"/>
   </dependencies>
 </info>

@@ -17,6 +17,7 @@ class OfferItem extends Entity {
     public $quantity;
     public $unitPriceCents;
     public $totalCents;
+    public $taxRateBp;
     public $createdAt;
     public $updatedAt;
 
@@ -30,6 +31,7 @@ class OfferItem extends Entity {
         $this->addType('quantity', 'integer');
         $this->addType('unitPriceCents', 'integer');
         $this->addType('totalCents', 'integer');
+        $this->addType('taxRateBp', 'integer');
         $this->addType('createdAt', 'integer');
         $this->addType('updatedAt', 'integer');
     }

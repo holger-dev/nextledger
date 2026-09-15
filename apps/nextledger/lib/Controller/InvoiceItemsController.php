@@ -59,6 +59,7 @@ class InvoiceItemsController extends ApiController {
         ?int $quantity = null,
         ?int $unitPriceCents = null,
         ?int $totalCents = null,
+        ?int $taxRateBp = null,
     ): JSONResponse {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $invoiceKey = (int)$invoiceId;
@@ -76,6 +77,7 @@ class InvoiceItemsController extends ApiController {
         $item->setQuantity($quantity);
         $item->setUnitPriceCents($unitPriceCents);
         $item->setTotalCents($totalCents);
+        $item->setTaxRateBp($taxRateBp);
         $item->setCreatedAt(time());
         $item->setUpdatedAt(time());
 
@@ -96,6 +98,7 @@ class InvoiceItemsController extends ApiController {
         ?int $quantity = null,
         ?int $unitPriceCents = null,
         ?int $totalCents = null,
+        ?int $taxRateBp = null,
     ): JSONResponse {
         $companyId = $this->activeCompanyService->getActiveCompanyId();
         $itemId = (int)$id;
@@ -113,6 +116,7 @@ class InvoiceItemsController extends ApiController {
         $item->setQuantity($quantity);
         $item->setUnitPriceCents($unitPriceCents);
         $item->setTotalCents($totalCents);
+        $item->setTaxRateBp($taxRateBp);
         $item->setUpdatedAt(time());
 
         $saved = $this->invoiceItemMapper->update($item);

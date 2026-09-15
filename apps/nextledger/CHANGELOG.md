@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 1.7.0
+All twelve open GitHub issues (#13–#24) addressed in one release.
+
+### Fixes
+- **#17** ZUGFeRD generation no longer fails with `simplexml_load_file(): …resolver function returned null`. Nextcloud's global libxml entity-loader hardening is temporarily lifted around the ZUGFeRD calls (only local vendor assets are parsed in that window) and re-armed afterwards.
+- **#21** Email attachments are now attached from memory with a sanitized filename and explicit MIME type instead of a temp-file path. Temp names with embedded dots no longer leak into the attachment and trigger mail-gateway rejections (SMTP 554 5.7.1 "blocked file type"). Applies to invoices and offers, SMTP and Nextcloud Mail provider.
+- **#19** The "due until" line is omitted entirely from invoice PDFs when no due date is set (no more dash placeholder).
+- **#22** Correspondence notes in the case view now wrap long content instead of stretching the table.
+
+### Features
+- **#13** The email preview when sending an invoice is now editable: recipients, subject, and body can be adjusted per email without touching the saved templates.
+- **#15** Closing greeting and signature name in offer/invoice PDFs are configurable under Settings → Texte; empty values fall back to the previous behaviour (default greeting + company owner).
+- **#24** Per-position VAT rates on invoices (e.g. 19/7/0 %). Items without an own rate inherit the invoice rate. Mixed-rate invoices show a VAT column and per-rate tax groups in the totals, in the PDF, and as separate BG-23 groups in the ZUGFeRD XML.
+- **#14** Custom invoice number schemes per company (e.g. `RE-{YYYY}-{SEQ4}`), with date placeholders and a sequence counter that resets per day/month/year depending on the placeholders used. Empty = legacy `YYYYMMDD-####`.
+- **#16** Receipt attachments on expenses: upload a PDF/image per expense (max. 10 MB); files are stored in Nextcloud Files under `NextLedger/<Firma>/<Wirtschaftsjahr>/Belege`.
+- **#23** Recurring expenses: expenses can repeat monthly, quarterly, or yearly (optional end date). A daily background job books the due occurrences automatically into the matching fiscal year.
+- **#18/#20** New "Dokument-Layout" section in company settings: toggle visibility of email/phone/VAT-ID/tax number in the PDF header, choose company-block position (top right or top left with the logo on the right), and pick the document font size (11/12/13 px). Applies to offers and invoices.
+
+### Schema
+- Migration `Version0024Date20260807` adds: `closing_greeting`/`signature_name` (texts), `tax_rate_bp` (invoice + offer items), `number_scheme`/`doc_layout` (company), `attachment_path` + recurring fields (expenses).
+
 ## 1.6.3
 - Add per-company logo upload (PNG, JPEG, SVG, GIF, WebP up to 1.5 MB) stored alongside the company record.
 - Add three PDF layout sizes for the logo (`small`, `medium`, `large`) which adjust the offer and invoice header automatically: small/medium place the logo next to the address block, large renders a banner above the address.

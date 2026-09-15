@@ -84,6 +84,51 @@ class ZugferdXmlServiceTest extends TestCase {
         $this->assertStringContainsString('DE00000000000000000000', $xml, 'IBAN payment means must be present.');
     }
 
+    public function testPerItemVatRatesProduceSeparateTaxGroups(): void {
+        $service = new ZugferdXmlService();
+
+        $company = new Company();
+        $company->setName('Misch GmbH');
+        $company->setCountryCode('DE');
+        $company->setCurrencyCode('EUR');
+        $company->setVatId('DE111222333');
+
+        $customer = new Customer();
+        $customer->setCompany('Kunde AG');
+        $customer->setCountryCode('DE');
+
+        $invoice = new Invoice();
+        $invoice->setNumber('R-MIX-1');
+        $invoice->setIssueDate(strtotime('2026-08-07 00:00:00'));
+        $invoice->setIsSmallBusiness(false);
+        $invoice->setTaxRateBp(1900);
+        // net 100 € @19% + net 50 € @7% → tax 19,00 + 3,50 = 22,50 → total 172,50
+        $invoice->setSubtotalCents(15000);
+        $invoice->setTaxCents(2250);
+        $invoice->setTotalCents(17250);
+
+        $itemStandard = new InvoiceItem();
+        $itemStandard->setName('Hardware');
+        $itemStandard->setQuantity(1);
+        $itemStandard->setUnitPriceCents(10000);
+        $itemStandard->setTotalCents(10000);
+        $itemStandard->setTaxRateBp(1900);
+
+        $itemReduced = new InvoiceItem();
+        $itemReduced->setName('Buch');
+        $itemReduced->setQuantity(1);
+        $itemReduced->setUnitPriceCents(5000);
+        $itemReduced->setTotalCents(5000);
+        $itemReduced->setTaxRateBp(700);
+
+        $xml = $service->buildXml($invoice, [$itemStandard, $itemReduced], $customer, $company, null);
+
+        $this->assertStringContainsString('19.00', $xml, '19% rate must be present.');
+        $this->assertStringContainsString('7.00', $xml, '7% rate must be present.');
+        $this->assertStringContainsString('3.50', $xml, '7% tax amount must be present.');
+        $this->assertStringContainsString('172.50', $xml, 'Grand total must be the sum of net + grouped taxes.');
+    }
+
     public function testSmallBusinessInvoiceUsesExemptionCategory(): void {
         $service = new ZugferdXmlService();
 

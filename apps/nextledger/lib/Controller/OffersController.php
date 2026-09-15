@@ -376,14 +376,21 @@ class OffersController extends ApiController {
             $message->setReplyTo([$emails['replyToEmail']]);
         }
 
-        $tmpPath = $this->writeTempAttachment($filename, $content);
-        try {
-            $attachment = $this->mailer->createAttachmentFromPath($tmpPath);
-            $message->attach($attachment);
-            $this->mailer->send($message);
-        } finally {
-            @unlink($tmpPath);
-        }
+        // Attach from memory with an explicit, clean filename and MIME type
+        // (temp-file names leaked into the attachment name before; see issue #21).
+        $attachment = $this->mailer->createAttachment(
+            $content,
+            $this->sanitizeAttachmentFilename($filename),
+            'application/pdf'
+        );
+        $message->attach($attachment);
+        $this->mailer->send($message);
+    }
+
+    private function sanitizeAttachmentFilename(string $filename): string {
+        $clean = preg_replace('/[^a-zA-Z0-9._-]+/', '_', trim($filename)) ?: 'attachment';
+        $clean = preg_replace('/\.{2,}/', '.', $clean) ?: 'attachment';
+        return trim($clean, '._-') ?: 'attachment';
     }
 
     private function sendWithMailProvider(
@@ -432,13 +439,6 @@ class OffersController extends ApiController {
             new Attachment($content, $filename, 'application/pdf')
         );
         $service->sendMessage($message);
-    }
-
-    private function writeTempAttachment(string $filename, string $content): string {
-        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename) ?: 'attachment.pdf';
-        $tmpPath = sys_get_temp_dir() . '/' . uniqid('nextledger-', true) . '-' . $safeName;
-        file_put_contents($tmpPath, $content);
-        return $tmpPath;
     }
 
     private function entityToArray(object $entity): array {

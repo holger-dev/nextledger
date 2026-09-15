@@ -196,15 +196,30 @@
         <template v-if="isDirectEmail">
           <p>{{ directDeliveryHint }}</p>
           <div class="email-preview">
-            <p><strong>{{ t('recipient') }}:</strong> {{ sendInvoicePreview?.to?.join(', ') || '–' }}</p>
-            <p v-if="!sendInvoicePreview?.to?.length" class="error">
+            <NcTextField
+              :label="t('recipient')"
+              :value.sync="sendInvoiceRecipients"
+              :label-outside="true"
+              :placeholder="t('recipientPlaceholder')"
+            />
+            <p v-if="!parsedRecipients.length" class="error">
               {{ t('noRecipientHint') }}
             </p>
             <p v-if="effectiveFromEmail"><strong>{{ t('sender') }}:</strong> {{ effectiveFromEmail }}</p>
             <p v-if="effectiveReplyToEmail"><strong>{{ t('replyTo') }}:</strong> {{ effectiveReplyToEmail }}</p>
-            <p><strong>{{ t('subject') }}:</strong> {{ sendInvoicePreview?.subject || '–' }}</p>
+            <NcTextField
+              :label="t('subject')"
+              :value.sync="sendInvoiceSubject"
+              :label-outside="true"
+            />
             <p><strong>{{ t('attachment') }}:</strong> {{ sendInvoicePreview?.attachmentName || '–' }}</p>
-            <pre class="email-body">{{ sendInvoicePreview?.body || '' }}</pre>
+            <label class="email-body-label">{{ t('emailBody') }}</label>
+            <textarea
+              v-model="sendInvoiceBody"
+              class="email-body-input"
+              rows="10"
+            ></textarea>
+            <p class="hint">{{ t('editHint') }}</p>
           </div>
           <div class="actions">
             <NcButton
@@ -306,6 +321,9 @@ export default {
       sendInvoiceTarget: null,
       sendInvoiceMailto: '',
       sendInvoicePreview: null,
+      sendInvoiceRecipients: '',
+      sendInvoiceSubject: '',
+      sendInvoiceBody: '',
       sendInvoiceError: '',
       sendingInvoice: false,
       sentInvoiceEmail: false,
@@ -353,9 +371,15 @@ export default {
     },
     canSendInvoiceEmail() {
       if (this.isDirectEmail) {
-        return !!this.sendInvoicePreview?.to?.length
+        return this.parsedRecipients.length > 0
       }
       return !!this.sendInvoiceMailto
+    },
+    parsedRecipients() {
+      return (this.sendInvoiceRecipients || '')
+        .split(/[,;\s]+/)
+        .map((entry) => entry.trim())
+        .filter((entry) => /.+@.+\..+/.test(entry))
     },
     isDirectEmail() {
       const mode = this.emailBehavior?.mode
@@ -498,6 +522,10 @@ export default {
         ...emailData,
         attachmentName: this.buildInvoiceAttachmentName(invoice),
       }
+      // Issue #13: preview values are editable per email — prefill from templates
+      this.sendInvoiceRecipients = (emailData.to || []).join(', ')
+      this.sendInvoiceSubject = emailData.subject || ''
+      this.sendInvoiceBody = emailData.body || ''
       this.sendInvoiceMailto = this.buildInvoiceMailtoFromData(emailData)
       if (!this.isDirectEmail) {
         const pdfUrl = getInvoicePdfUrl(invoice.id)
@@ -510,15 +538,24 @@ export default {
       this.sendInvoiceTarget = null
       this.sendInvoiceMailto = ''
       this.sendInvoicePreview = null
+      this.sendInvoiceRecipients = ''
+      this.sendInvoiceSubject = ''
+      this.sendInvoiceBody = ''
       this.sendInvoiceError = ''
       this.sendingInvoice = false
       this.sentInvoiceEmail = false
     },
     openInvoiceMailto() {
-      if (!this.sendInvoiceMailto) {
+      // rebuild from the (possibly edited) preview values
+      const mailto = this.buildInvoiceMailtoFromData({
+        to: this.parsedRecipients,
+        subject: this.sendInvoiceSubject,
+        body: this.sendInvoiceBody,
+      })
+      if (!mailto) {
         return
       }
-      window.location.href = this.sendInvoiceMailto
+      window.location.href = mailto
     },
     buildInvoiceMailtoFromData(data) {
       const to = data.to.join(',')
@@ -581,9 +618,9 @@ export default {
       this.sentInvoiceEmail = false
       try {
         await sendInvoiceEmail(this.sendInvoiceTarget.id, {
-          to: this.sendInvoicePreview.to,
-          subject: this.sendInvoicePreview.subject,
-          body: this.sendInvoicePreview.body,
+          to: this.parsedRecipients,
+          subject: this.sendInvoiceSubject,
+          body: this.sendInvoiceBody,
         })
         this.sentInvoiceEmail = true
         window.setTimeout(() => {
@@ -831,6 +868,25 @@ export default {
   margin-top: 8px;
   max-height: 200px;
   overflow: auto;
+}
+
+.email-body-label {
+  display: block;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.email-body-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-main-background, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 4px;
+  font-family: inherit;
+  font-size: inherit;
+  resize: vertical;
 }
 
 .hint {

@@ -43,6 +43,8 @@ return [
         ['name' => 'expenses#create', 'url' => '/api/fiscal-years/{fiscalYearId}/expenses', 'verb' => 'POST'],
         ['name' => 'expenses#update', 'url' => '/api/expenses/{id}', 'verb' => 'PUT'],
         ['name' => 'expenses#destroy', 'url' => '/api/expenses/{id}', 'verb' => 'DELETE'],
+        ['name' => 'expenses#uploadAttachment', 'url' => '/api/expenses/{id}/attachment', 'verb' => 'POST'],
+        ['name' => 'expenses#deleteAttachment', 'url' => '/api/expenses/{id}/attachment', 'verb' => 'DELETE'],
         ['name' => 'fiscalReports#gubPdf', 'url' => '/api/fiscal-years/{id}/gub/pdf', 'verb' => 'GET'],
         ['name' => 'customers#list', 'url' => '/api/customers', 'verb' => 'GET'],
         ['name' => 'customers#create', 'url' => '/api/customers', 'verb' => 'POST'],

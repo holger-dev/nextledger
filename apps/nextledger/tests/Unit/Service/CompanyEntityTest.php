@@ -38,4 +38,30 @@ class CompanyEntityTest extends TestCase {
         $this->assertSame('CH', $customer->getCountryCode());
         $this->assertSame('CHE-123.456.789', $customer->getVatId());
     }
+
+    public function testCompanyExposes170Fields(): void {
+        $company = new \OCA\NextLedger\Db\Company();
+        $company->setNumberScheme('RE-{YYYY}-{SEQ4}');
+        $company->setDocLayout('{"showVatId":true}');
+        $this->assertSame('RE-{YYYY}-{SEQ4}', $company->getNumberScheme());
+        $this->assertSame('{"showVatId":true}', $company->getDocLayout());
+    }
+
+    public function testExpenseExposesRecurringAndAttachmentFields(): void {
+        $expense = new \OCA\NextLedger\Db\Expense();
+        $expense->setAttachmentPath('NextLedger/Firma/2026/Belege/beleg.pdf');
+        $expense->setRecurringInterval('monthly');
+        $expense->setRecurringUntil(1798761600);
+        $expense->setRecurringParentId(42);
+        $this->assertSame('monthly', $expense->getRecurringInterval());
+        $this->assertSame('NextLedger/Firma/2026/Belege/beleg.pdf', $expense->getAttachmentPath());
+        $this->assertSame(1798761600, $expense->getRecurringUntil());
+        $this->assertSame(42, $expense->getRecurringParentId());
+    }
+
+    public function testInvoiceItemExposesTaxRate(): void {
+        $item = new \OCA\NextLedger\Db\InvoiceItem();
+        $item->setTaxRateBp(700);
+        $this->assertSame(700, $item->getTaxRateBp());
+    }
 }

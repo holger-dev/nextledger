@@ -14,6 +14,11 @@ class Expense extends Entity {
     public $description;
     public $amountCents;
     public $bookedAt;
+    public $attachmentPath;
+    public $recurringInterval;
+    public $recurringUntil;
+    public $recurringParentId;
+    public $lastRecurredAt;
     public $createdAt;
     public $updatedAt;
 
@@ -24,6 +29,11 @@ class Expense extends Entity {
         $this->addType('description', 'text');
         $this->addType('amountCents', 'integer');
         $this->addType('bookedAt', 'integer');
+        $this->addType('attachmentPath', 'string');
+        $this->addType('recurringInterval', 'string');
+        $this->addType('recurringUntil', 'integer');
+        $this->addType('recurringParentId', 'integer');
+        $this->addType('lastRecurredAt', 'integer');
         $this->addType('createdAt', 'integer');
         $this->addType('updatedAt', 'integer');
     }
