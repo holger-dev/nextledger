@@ -332,5 +332,14 @@ export default {
   border-top: 1px solid var(--color-border, #e5e7eb);
   margin: 8px 12px;
   height: 0;
+  list-style: none;
+}
+
+/* Suppress stray list bullets on navigation items/spacers
+   (visible on hosts whose global CSS reset doesn't cover them) */
+:global(.app-navigation ul),
+:global(.app-navigation li),
+:global(.app-navigation__list li) {
+  list-style: none !important;
 }
 </style>
