@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 1.7.1
+- Raise supported Nextcloud version to **34** (`min-version 30`, `max-version 34`). NC34's removed frontend legacy APIs (jQuery, Backbone, `OC.Dialogs`/`OC.Notifications`/`OC.Apps`, global snapper) are not used by NextLedger; the backend introduces no breaking changes. Fixes the App Store install error "Server Version 33 oder niedriger wird benötigt" on Nextcloud 34.
+
 ## 1.7.0
 All twelve open GitHub issues (#13–#24) addressed in one release.
 

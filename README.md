@@ -141,7 +141,7 @@ Mail text supports placeholders like:
 - `{{caseName}}`, `{{total}}`, `{{issueDate}}`
 
 ## Compatibility
-- **Nextcloud 30 – 33**
+- **Nextcloud 30 – 34**
 - **PHP ≥ 8.1** (Composer dependencies resolved against a PHP 8.2 platform)
 
 ## Installation (Nextcloud)
