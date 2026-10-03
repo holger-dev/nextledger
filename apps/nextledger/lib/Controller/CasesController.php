@@ -9,6 +9,7 @@ use OCA\NextLedger\Db\CaseEntityMapper;
 use OCA\NextLedger\Db\CounterMapper;
 use OCA\NextLedger\Db\CustomerMapper;
 use OCA\NextLedger\Service\ActiveCompanyService;
+use OCA\NextLedger\Service\NumberGenerator;
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
@@ -20,6 +21,7 @@ class CasesController extends ApiController {
     public function __construct(
         string $appName,
         IRequest $request,
+        private NumberGenerator $numberGenerator,
         private CaseEntityMapper $caseMapper,
         private CounterMapper $counterMapper,
         private CustomerMapper $customerMapper,
@@ -75,7 +77,7 @@ class CasesController extends ApiController {
         $case->setCustomerId($customerId);
         $case->setName($name);
         $case->setDescription($description);
-        $case->setCaseNumber($this->generateCaseNumber($companyId));
+        $case->setCaseNumber($this->numberGenerator->nextCaseNumber());
         $case->setDeckLink($deckLink);
         $case->setKollektivLink($kollektivLink);
         $case->setIsArchived(false);
@@ -160,15 +162,6 @@ class CasesController extends ApiController {
         }
 
         return get_object_vars($entity);
-    }
-
-    private function generateCaseNumber(int $companyId): string {
-        $dateKey = date('Ymd');
-        $counterKey = sprintf('case-%d-%s', $companyId, $dateKey);
-        $counter = $this->counterMapper->increment($counterKey);
-        $running = str_pad((string)$counter->getCounterValue(), 3, '0', STR_PAD_LEFT);
-
-        return sprintf('%s-%s', $dateKey, $running);
     }
 
     private function parseArchiveFilter(?string $value): string {

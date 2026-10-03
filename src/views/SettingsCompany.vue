@@ -158,7 +158,10 @@
       />
       <p class="hint">{{ t('mailAttachmentHint') }}</p>
 
-      <NcTextField :label="t('numberScheme')" :value.sync="form.numberScheme" :placeholder="t('numberSchemePlaceholder')" />
+	  <h2>{{ t('numberSchemeSection') }}</h2>
+      <NcTextField :label="t('numberSchemeInvoice')" :value.sync="form.numberScheme" :placeholder="t('numberSchemePlaceholder')" />
+      <NcTextField :label="t('numberSchemeOffer')" :value.sync="form.numberSchemeOffer" :placeholder="t('numberSchemePlaceholder')" />
+      <NcTextField :label="t('numberSchemeCase')" :value.sync="form.numberSchemeCase" :placeholder="t('numberSchemePlaceholder')" />
       <p class="hint">{{ t('numberSchemeHint') }}</p>
 
       <h2>{{ t('docLayoutSection') }}</h2>
@@ -310,6 +313,8 @@ export default {
         logoSize: 'medium',
         mailAttachment: 'pdf',
         numberScheme: '',
+        numberSchemeOffer: '',
+        numberSchemeCase: '',
         docLayout: null,
       },
     }
@@ -420,6 +425,8 @@ export default {
         logoSize: safeString(data.logoSize || 'medium'),
         mailAttachment: safeString(data.mailAttachment || 'pdf'),
         numberScheme: safeString(data.numberScheme),
+        numberSchemeOffer: safeString(data.numberSchemeOffer),
+        numberSchemeCase: safeString(data.numberSchemeCase),
         docLayout: data.docLayout || null,
       }
       let parsedLayout = {}

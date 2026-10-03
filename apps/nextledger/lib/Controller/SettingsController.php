@@ -135,6 +135,8 @@ class SettingsController extends ApiController {
         ?string $logoSize = null,
         ?string $mailAttachment = null,
         ?string $numberScheme = null,
+        ?string $numberSchemeOffer = null,
+        ?string $numberSchemeCase = null,
         ?string $docLayout = null,
     ): JSONResponse {
         $company = new Company();
@@ -157,6 +159,8 @@ class SettingsController extends ApiController {
         $company->setLogoSize($this->normalizeLogoSize($logoSize));
         $company->setMailAttachment($this->normalizeMailAttachment($mailAttachment));
         $company->setNumberScheme($this->normalizeNumberScheme($numberScheme));
+        $company->setNumberSchemeOffer($this->normalizeNumberScheme($numberSchemeOffer));
+        $company->setNumberSchemeCase($this->normalizeNumberScheme($numberSchemeCase));
         $company->setDocLayout($this->normalizeDocLayout($docLayout));
 
         /** @var Company $saved */
@@ -257,6 +261,8 @@ class SettingsController extends ApiController {
         ?string $logoSize = null,
         ?string $mailAttachment = null,
         ?string $numberScheme = null,
+        ?string $numberSchemeOffer = null,
+        ?string $numberSchemeCase = null,
         ?string $docLayout = null,
     ): JSONResponse {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -278,6 +284,8 @@ class SettingsController extends ApiController {
         $company->setLogoSize($this->normalizeLogoSize($logoSize));
         $company->setMailAttachment($this->normalizeMailAttachment($mailAttachment));
         $company->setNumberScheme($this->normalizeNumberScheme($numberScheme));
+        $company->setNumberSchemeOffer($this->normalizeNumberScheme($numberSchemeOffer));
+        $company->setNumberSchemeCase($this->normalizeNumberScheme($numberSchemeCase));
         $company->setDocLayout($this->normalizeDocLayout($docLayout));
         /** @var Company $saved */
         $saved = $this->companyMapper->update($company);

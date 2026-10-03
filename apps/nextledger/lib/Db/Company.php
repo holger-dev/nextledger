@@ -29,6 +29,8 @@ class Company extends Entity {
     public $countryCode;
     public $mailAttachment;
     public $numberScheme;
+    public $numberSchemeOffer;
+    public $numberSchemeCase;
     public $docLayout;
 
     public function __construct() {
@@ -53,6 +55,8 @@ class Company extends Entity {
         $this->addType('countryCode', 'string');
         $this->addType('mailAttachment', 'string');
         $this->addType('numberScheme', 'string');
+        $this->addType('numberSchemeOffer', 'string');
+        $this->addType('numberSchemeCase', 'string');
         $this->addType('docLayout', 'string');
     }
 }

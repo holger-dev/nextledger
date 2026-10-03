@@ -31,7 +31,7 @@ class NumberGenerator {
     ) {}
 
     public function nextInvoiceNumber(?DateTimeInterface $date = null): string {
-        $scheme = $this->getCompanyScheme();
+        $scheme = $this->getCompanySchemeInvoice();
         if ($scheme !== null) {
             return $this->nextSchemeNumber('invoice', $scheme, $date);
         }
@@ -39,7 +39,19 @@ class NumberGenerator {
     }
 
     public function nextOfferNumber(?DateTimeInterface $date = null): string {
+        $scheme = $this->getCompanySchemeOffer();
+        if ($scheme !== null) {
+            return $this->nextSchemeNumber('offer', $scheme, $date);
+        }
         return $this->nextNumber('offer', $date);
+    }
+
+    public function nextCaseNumber(?DateTimeInterface $date = null): string {
+        $scheme = $this->getCompanySchemeCase();
+        if ($scheme !== null) {
+            return $this->nextSchemeNumber('case', $scheme, $date);
+        }
+        return $this->nextNumber('case', $date);
     }
 
     /**
@@ -58,11 +70,33 @@ class NumberGenerator {
         return preg_match_all('/\{SEQ[3-6]?\}/', $scheme) === 1;
     }
 
-    private function getCompanyScheme(): ?string {
+    private function getCompanySchemeInvoice(): ?string {
         try {
             $companyId = $this->activeCompanyService->getActiveCompanyId();
             $company = $this->companyMapper->find($companyId);
             $scheme = trim((string)($company->getNumberScheme() ?? ''));
+            return $scheme !== '' && $this->isValidScheme($scheme) ? $scheme : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function getCompanySchemeOffer(): ?string {
+        try {
+            $companyId = $this->activeCompanyService->getActiveCompanyId();
+            $company = $this->companyMapper->find($companyId);
+            $scheme = trim((string)($company->getNumberSchemeOffer() ?? ''));
+            return $scheme !== '' && $this->isValidScheme($scheme) ? $scheme : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function getCompanySchemeCase(): ?string {
+        try {
+            $companyId = $this->activeCompanyService->getActiveCompanyId();
+            $company = $this->companyMapper->find($companyId);
+            $scheme = trim((string)($company->getNumberSchemeCase() ?? ''));
             return $scheme !== '' && $this->isValidScheme($scheme) ? $scheme : null;
         } catch (\Throwable $e) {
             return null;
