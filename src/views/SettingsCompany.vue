@@ -196,7 +196,7 @@
         @input="layoutForm.fontSize = $event"
       />
 
-      <div v-if="canManageUsers" class="share-box">
+      <div v-if="canManageUsers" class="share-user-box">
         <NcSelect
           :value="selectedSharedUserId"
           :options="sharedUserOptions"
@@ -631,7 +631,7 @@ export default {
   margin-bottom: 16px;
 }
 
-.share-box {
+.share-user-box {
   display: flex;
   flex-direction: column;
   gap: 12px;
