@@ -9,6 +9,8 @@ use OCA\NextLedger\Db\Company;
 use OCA\NextLedger\Db\CompanyMapper;
 use OCA\NextLedger\Db\DocumentSetting;
 use OCA\NextLedger\Db\DocumentSettingMapper;
+use OCA\NextLedger\Db\MailLog;
+use OCA\NextLedger\Db\MailLogMapper;
 use OCA\NextLedger\Db\MiscSetting;
 use OCA\NextLedger\Db\MiscSettingMapper;
 use OCA\NextLedger\Db\TaxSetting;
@@ -32,6 +34,7 @@ class SettingsController extends ApiController {
         private TextsMapper $textsMapper,
         private TaxSettingMapper $taxSettingMapper,
         private MiscSettingMapper $miscSettingMapper,
+        private MailLogMapper $mailLogMapper,
         private DocumentSettingMapper $documentSettingMapper,
         private ActiveCompanyService $activeCompanyService,
         private DocumentLocaleService $documentLocaleService,
@@ -547,6 +550,21 @@ class SettingsController extends ApiController {
      */
     public function getEmailBehavior(): JSONResponse {
         return new JSONResponse($this->emailSettingsService->getSettings());
+    }
+
+    /**
+     * Recent email delivery attempts of the active company (newest first).
+     *
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
+    public function getMailLog(): JSONResponse {
+        $companyId = $this->activeCompanyService->getActiveCompanyId();
+        $entries = array_map(
+            fn(MailLog $entry) => $this->entityToArray($entry),
+            $this->mailLogMapper->findRecentByCompanyId($companyId, 100)
+        );
+        return new JSONResponse($entries);
     }
 
     /**

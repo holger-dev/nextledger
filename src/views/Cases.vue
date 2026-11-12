@@ -1285,7 +1285,8 @@ export default {
           this.closeSendOfferModal()
         }, 700)
       } catch (e) {
-        this.sendOfferError = this.t('sendEmailError')
+        // show the backend/SMTP error detail when available
+        this.sendOfferError = e?.response?.data?.message || this.t('sendEmailError')
       } finally {
         this.sendingOffer = false
       }
@@ -1350,7 +1351,7 @@ export default {
           this.closeSendInvoiceModal()
         }, 700)
       } catch (e) {
-        this.sendInvoiceError = this.t('sendEmailError')
+        this.sendInvoiceError = e?.response?.data?.message || this.t('sendEmailError')
       } finally {
         this.sendingInvoice = false
       }

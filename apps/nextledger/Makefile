@@ -14,7 +14,6 @@ appstore:
 	@test -f "$(PRIVATE_KEY)" || (echo "Missing private key: $(PRIVATE_KEY)" && exit 1)
 	@test -f "$(PUBLIC_CRT)" || (echo "Missing certificate: $(PUBLIC_CRT)" && exit 1)
 	@test -f "$(OCC)" || (echo "Missing occ at $(OCC) (run inside Nextcloud server)" && exit 1)
-	php "$(OCC)" integrity:sign-app --path "$(CURDIR)" --privateKey "$(PRIVATE_KEY)" --certificate "$(PUBLIC_CRT)"
 	mkdir -p "$(APPSTORE_DIR)"
 	rsync -a --delete \
 		--exclude ".git" \
@@ -25,6 +24,7 @@ appstore:
 		--exclude "$(BUILD_DIR)" \
 		--exclude ".DS_Store" \
 		./ "$(APPSTORE_DIR)/"
+	php "$(OCC)" integrity:sign-app --path "$(CURDIR)/$(APPSTORE_DIR)" --privateKey "$(PRIVATE_KEY)" --certificate "$(PUBLIC_CRT)"
 	mkdir -p "$(dir $(ARCHIVE))"
 	tar -czf "$(ARCHIVE)" -C "$(BUILD_DIR)/artifacts/appstore" "$(APP_NAME)"
 	@echo "Created $(ARCHIVE)"

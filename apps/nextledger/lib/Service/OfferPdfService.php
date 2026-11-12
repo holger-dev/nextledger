@@ -182,7 +182,6 @@ class OfferPdfService {
             %s
             <div class="customer">%s</div>
             <h1>%s %s</h1>
-            <p><strong>%s:</strong> %s</p>
             <p><strong>%s:</strong> %s<br><strong>%s:</strong> %s</p>
             <p>%s</p>
             <p>%s</p>
@@ -215,8 +214,6 @@ class OfferPdfService {
             $companyHeader,
             $customerBlock,
             $this->escape($this->t($languageCode, 'offer')),
-            $this->escape($offer->getNumber() ?? ''),
-            $this->escape($this->t($languageCode, 'offer_number')),
             $this->escape($offer->getNumber() ?? ''),
             $this->escape($this->t($languageCode, 'date')),
             $issueDate,

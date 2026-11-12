@@ -369,7 +369,6 @@ class InvoicePdfService {
             %s
             <div class="customer">%s</div>
             <h1>%s %s</h1>
-            <p><strong>%s:</strong> %s</p>
             %s
             %s
             %s
@@ -405,8 +404,6 @@ class InvoicePdfService {
             $companyHeader,
             $customerBlock,
             $this->escape($title),
-            $this->escape($invoice->getNumber() ?? ''),
-            $this->escape($this->t($languageCode, 'invoice_number')),
             $this->escape($invoice->getNumber() ?? ''),
             $dateBlock,
             $offerReference,

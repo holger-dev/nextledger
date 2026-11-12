@@ -45,3 +45,4 @@ export const saveDocuments = (payload) => put('documents', payload)
 
 export const getEmailBehavior = () => get('email-behavior')
 export const saveEmailBehavior = (payload) => put('email-behavior', payload)
+export const getMailLog = () => get('mail-log')

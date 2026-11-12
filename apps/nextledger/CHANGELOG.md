@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.7.3
+- Add an **email delivery log**: every direct-send attempt (invoice and offer, success and failure) is recorded per company and shown under Settings → E-Mailverhalten → Versandprotokoll, including the mail server's error message. Migration `Version0025Date20260924` creates `nl_mail_log`; entries are pruned to the most recent 200 per company.
+- Surface the underlying mailer/SMTP error (e.g. gateway rejections such as `554 5.7.1 blocked file type`) in the send dialog instead of a generic "sending failed" message — for invoices and offers.
+- Remove the redundant "Rechnungsnummer:"/"Angebotsnummer:" line from the PDFs; the number remains in the document heading.
+- Update dompdf to ^3.1 to silence PHP 8.4 "implicitly nullable parameter" deprecation warnings flooding the Nextcloud log (run `composer update` inside `apps/nextledger`).
+- Fix the **code integrity check** reporting 144 `FILE_MISSING` entries (docs/, tests/, vendor test/.github/build files): the release archive was signed *before* those paths were stripped from the tarball, so `signature.json` referenced files that never shipped. The archive is now signed after packaging, so signature and tarball contents match.
+
 ## 1.7.2
 Fixes ZUGFeRD/EN16931 validation for Kleinunternehmer invoices (reported by Thomas Gunzelmann — thank you!).
 

@@ -86,6 +86,44 @@
         <span v-if="saved" class="success">{{ t('saved') }}</span>
         <span v-if="error" class="error">{{ error }}</span>
       </div>
+
+      <div class="section mail-log">
+        <div class="section__header">
+          <h2>{{ t('mailLogTitle') }}</h2>
+          <p class="hint">{{ t('mailLogHint') }}</p>
+        </div>
+        <p v-if="mailLog.length === 0" class="hint">{{ t('mailLogEmpty') }}</p>
+        <table v-else class="table">
+          <thead>
+            <tr>
+              <th>{{ t('mailLogTime') }}</th>
+              <th>{{ t('mailLogDocument') }}</th>
+              <th>{{ t('mailLogRecipients') }}</th>
+              <th>{{ t('mailLogStatus') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="entry in mailLog">
+              <tr :key="entry.id">
+                <td>{{ formatLogTime(entry.createdAt) }}</td>
+                <td>
+                  {{ entry.documentType === 'offer' ? t('mailLogOffer') : t('mailLogInvoice') }}
+                  {{ entry.documentNumber || '–' }}
+                </td>
+                <td class="recipients">{{ entry.recipients || '–' }}</td>
+                <td>
+                  <span :class="entry.status === 'sent' ? 'status-sent' : 'status-failed'">
+                    {{ entry.status === 'sent' ? t('mailLogSent') : t('mailLogFailed') }}
+                  </span>
+                </td>
+              </tr>
+              <tr v-if="entry.status !== 'sent' && entry.error" :key="`err-${entry.id}`">
+                <td colspan="4" class="log-error">{{ entry.error }}</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 </template>
@@ -94,7 +132,7 @@
 import { NcButton, NcCheckboxRadioSwitch, NcLoadingIcon } from '@nextcloud/vue'
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.mjs'
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.mjs'
-import { getEmailBehavior, saveEmailBehavior } from '../api/settings'
+import { getEmailBehavior, getMailLog, saveEmailBehavior } from '../api/settings'
 
 export default {
   name: 'SettingsEmailBehavior',
@@ -121,6 +159,7 @@ export default {
       },
       activeCompanyId: null,
       mailProviders: [],
+      mailLog: [],
     }
   },
   computed: {
@@ -169,10 +208,25 @@ export default {
   },
   async mounted() {
     await this.load()
+    await this.loadMailLog()
   },
   methods: {
     t(key) {
       return this.$tKey(`settingsEmailBehavior.${key}`, key)
+    },
+    async loadMailLog() {
+      try {
+        const entries = await getMailLog()
+        this.mailLog = Array.isArray(entries) ? entries : []
+      } catch (e) {
+        this.mailLog = []
+      }
+    },
+    formatLogTime(timestamp) {
+      if (!timestamp) {
+        return '–'
+      }
+      return new Date(timestamp * 1000).toLocaleString()
     },
     applyResponse(data) {
       const mappings = Array.isArray(data.companyMappings) ? data.companyMappings : []
@@ -349,6 +403,41 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.mail-log .table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mail-log th,
+.mail-log td {
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.mail-log td.recipients {
+  overflow-wrap: anywhere;
+  max-width: 320px;
+}
+
+.status-sent {
+  color: var(--color-success, #2d7b41);
+  font-weight: 600;
+}
+
+.status-failed {
+  color: var(--color-error, #b91c1c);
+  font-weight: 600;
+}
+
+.log-error {
+  color: var(--color-error, #b91c1c);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  background: var(--color-background-dark, #f7f9fb);
 }
 
 .hint {

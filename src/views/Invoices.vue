@@ -627,7 +627,8 @@ export default {
           this.closeSendInvoiceModal()
         }, 700)
       } catch (e) {
-        this.sendInvoiceError = this.t('sendError')
+        // show the backend/SMTP error detail when available (e.g. gateway rejections)
+        this.sendInvoiceError = e?.response?.data?.message || this.t('sendError')
       } finally {
         this.sendingInvoice = false
       }

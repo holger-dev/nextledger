@@ -7,6 +7,7 @@ namespace OCA\NextLedger\Controller;
 use OCA\NextLedger\Db\CaseEntityMapper;
 use OCA\NextLedger\Db\CompanyMapper;
 use OCA\NextLedger\Db\CustomerMapper;
+use OCA\NextLedger\Db\MailLogMapper;
 use OCA\NextLedger\Db\FiscalYearMapper;
 use OCA\NextLedger\Db\Income;
 use OCA\NextLedger\Db\IncomeMapper;
@@ -46,6 +47,7 @@ class InvoicesController extends ApiController {
         private CaseEntityMapper $caseMapper,
         private CustomerMapper $customerMapper,
         private CompanyMapper $companyMapper,
+        private MailLogMapper $mailLogMapper,
         private ActiveCompanyService $activeCompanyService,
         private DocumentStorageService $documentStorageService,
     ) {
@@ -396,10 +398,42 @@ class InvoicesController extends ApiController {
         try {
             $this->sendWithAttachments($recipients, (string)$subject, (string)$body, $attachments);
         } catch (\Throwable $e) {
-            return new JSONResponse(['message' => 'E-Mail konnte nicht gesendet werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+            $this->logMailAttempt($companyId, 'invoice', $invoice, $recipients, (string)$subject, 'failed', $e->getMessage());
+            // Surface the underlying mailer/SMTP error (e.g. gateway rejections
+            // like "554 blocked file type") so users can diagnose it in the UI.
+            return new JSONResponse(
+                ['message' => 'E-Mail konnte nicht gesendet werden: ' . mb_substr($e->getMessage(), 0, 300)],
+                Http::STATUS_INTERNAL_SERVER_ERROR
+            );
         }
 
+        $this->logMailAttempt($companyId, 'invoice', $invoice, $recipients, (string)$subject, 'sent', null);
         return new JSONResponse(['status' => 'sent']);
+    }
+
+    private function logMailAttempt(
+        int $companyId,
+        string $documentType,
+        object $document,
+        array $recipients,
+        string $subject,
+        string $status,
+        ?string $error,
+    ): void {
+        try {
+            $this->mailLogMapper->record(
+                $companyId,
+                $documentType,
+                (int)$document->getId(),
+                (string)($document->getNumber() ?? ''),
+                $recipients,
+                $subject,
+                $status,
+                $error
+            );
+        } catch (\Throwable $e) {
+            // logging must never break the send flow
+        }
     }
 
     private function resolveMailAttachmentSetting(int $companyId): string {

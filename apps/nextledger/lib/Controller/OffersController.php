@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\NextLedger\Controller;
 
 use OCA\NextLedger\Db\CaseEntityMapper;
+use OCA\NextLedger\Db\MailLogMapper;
 use OCA\NextLedger\Db\CustomerMapper;
 use OCA\NextLedger\Db\Offer;
 use OCA\NextLedger\Db\OfferMapper;
@@ -39,6 +40,7 @@ class OffersController extends ApiController {
         private IMailProviderManager $mailProviderManager,
         private CaseEntityMapper $caseMapper,
         private CustomerMapper $customerMapper,
+        private MailLogMapper $mailLogMapper,
         private ActiveCompanyService $activeCompanyService,
         private DocumentStorageService $documentStorageService,
     ) {
@@ -301,10 +303,39 @@ class OffersController extends ApiController {
         try {
             $this->sendWithAttachment($recipients, (string)$subject, (string)$body, $result['filename'], $result['content']);
         } catch (\Throwable $e) {
-            return new JSONResponse(['message' => 'E-Mail konnte nicht gesendet werden.'], Http::STATUS_INTERNAL_SERVER_ERROR);
+            $this->logMailAttempt($companyId, $offer, $recipients, (string)$subject, 'failed', $e->getMessage());
+            return new JSONResponse(
+                ['message' => 'E-Mail konnte nicht gesendet werden: ' . mb_substr($e->getMessage(), 0, 300)],
+                Http::STATUS_INTERNAL_SERVER_ERROR
+            );
         }
 
+        $this->logMailAttempt($companyId, $offer, $recipients, (string)$subject, 'sent', null);
         return new JSONResponse(['status' => 'sent']);
+    }
+
+    private function logMailAttempt(
+        int $companyId,
+        object $offer,
+        array $recipients,
+        string $subject,
+        string $status,
+        ?string $error,
+    ): void {
+        try {
+            $this->mailLogMapper->record(
+                $companyId,
+                'offer',
+                (int)$offer->getId(),
+                (string)($offer->getNumber() ?? ''),
+                $recipients,
+                $subject,
+                $status,
+                $error
+            );
+        } catch (\Throwable $e) {
+            // logging must never break the send flow
+        }
     }
 
     private function caseExistsInCompany(int $caseId, int $companyId): bool {

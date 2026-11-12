@@ -26,6 +26,7 @@ return [
         ['name' => 'settings#getDocuments', 'url' => '/api/settings/documents', 'verb' => 'GET'],
         ['name' => 'settings#saveDocuments', 'url' => '/api/settings/documents', 'verb' => 'PUT'],
         ['name' => 'settings#getEmailBehavior', 'url' => '/api/settings/email-behavior', 'verb' => 'GET'],
+        ['name' => 'settings#getMailLog', 'url' => '/api/settings/mail-log', 'verb' => 'GET'],
         ['name' => 'settings#saveEmailBehavior', 'url' => '/api/settings/email-behavior', 'verb' => 'PUT'],
         ['name' => 'products#list', 'url' => '/api/products', 'verb' => 'GET'],
         ['name' => 'products#create', 'url' => '/api/products', 'verb' => 'POST'],

@@ -128,6 +128,7 @@ Configure per company under **Settings → Firma → Dokument-Layout**:
 - Attachment policy per company: **PDF only**, **ZUGFeRD‑XML only**, or **both**
 - The send dialog shows an **editable preview** (recipients, subject, body) — changes apply to that one email only
 - Invoice recipients are controlled per customer (billing email and/or contact email switches)
+- A **delivery log** under Settings → E-Mailverhalten lists the last 100 send attempts per company (success/failure) including the mail server's error message — failed sends also show the underlying SMTP error directly in the send dialog
 
 ### Multi-Company
 - Manage multiple companies under **Settings → Firma**; exactly one company is active at a time
